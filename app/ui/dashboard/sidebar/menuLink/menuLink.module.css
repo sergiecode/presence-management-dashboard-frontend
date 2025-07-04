@@ -1,0 +1,18 @@
+.container {
+  padding: 11px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 5px 0px;
+  border-radius: 11px;
+}
+
+.container:hover,
+.active {
+  border: 1px solid #fff;
+  color: #000;
+  background: #ab9e8e;
+  background: -webkit-linear-gradient(to left, #eef2f3, #ab9e8e);
+  background: linear-gradient(to left, #eef2f3, #ab9e8e);
+
+}
