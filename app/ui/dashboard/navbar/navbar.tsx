@@ -1,18 +1,11 @@
-"use client"
+"use client";
 
-import { NextPage } from 'next'
+import { NextPage } from "next";
 import { usePathname } from "next/navigation";
 import styles from "./navbar.module.css";
-import {
-  MdNotifications,
-  MdOutlineChat,
-  MdPublic,
-  MdSearch,
-} from "react-icons/md";
+import { MdNotifications, MdOutlineChat, MdPublic } from "react-icons/md";
 
-interface Props {}
-
-const Navbar: NextPage<Props> = ({}) => {
+const Navbar: NextPage = () => {
   const pathname = usePathname();
   return (
     <div className={styles.container}>
@@ -30,6 +23,6 @@ const Navbar: NextPage<Props> = ({}) => {
       </div>
     </div>
   );
-}
+};
 
-export default Navbar
+export default Navbar;

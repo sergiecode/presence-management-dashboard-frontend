@@ -1,20 +1,21 @@
 export interface LoginFormValues {
-  email: string
-  password: string
+  email: string;
+  password: string;
 }
 
 export interface User {
-  id: string
-  email: string
-  role: string
-  emailConfirmed: boolean
-  pendingApproval: boolean
-  deactivated: boolean
-  name?: string // opcional si tienes ese campo
+  id: number;
+  email: string;
+  name: string;
+  picture: string;
+  role: string;
 }
 
 export interface LoginResponse {
-  token: string
-  refresh_token: string
-  user: User
+  email: string;
+  id: number;
+  name: string;
+  picture: string;
+  role: string;
+  token: string;
 }

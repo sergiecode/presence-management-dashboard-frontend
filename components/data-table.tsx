@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
   closestCenter,
   DndContext,
@@ -11,15 +11,15 @@ import {
   useSensors,
   type DragEndEvent,
   type UniqueIdentifier,
-} from "@dnd-kit/core"
-import { restrictToVerticalAxis } from "@dnd-kit/modifiers"
+} from "@dnd-kit/core";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import {
   arrayMove,
   SortableContext,
   useSortable,
   verticalListSortingStrategy,
-} from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   IconChevronDown,
   IconChevronLeft,
@@ -32,9 +32,8 @@ import {
   IconGripVertical,
   IconLayoutColumns,
   IconLoader,
-  IconPlus,
   IconTrendingUp,
-} from "@tabler/icons-react"
+} from "@tabler/icons-react";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -49,21 +48,21 @@ import {
   SortingState,
   useReactTable,
   VisibilityState,
-} from "@tanstack/react-table"
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
-import { toast } from "sonner"
-import { z } from "zod"
+} from "@tanstack/react-table";
+import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
+import { toast } from "sonner";
+import { z } from "zod";
 
-import { useIsMobile } from "@/hooks/use-mobile"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-} from "@/components/ui/chart"
-import { Checkbox } from "@/components/ui/checkbox"
+} from "@/components/ui/chart";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Drawer,
   DrawerClose,
@@ -73,7 +72,7 @@ import {
   DrawerHeader,
   DrawerTitle,
   DrawerTrigger,
-} from "@/components/ui/drawer"
+} from "@/components/ui/drawer";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -81,17 +80,17 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -99,13 +98,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const schema = z.object({
   id: z.number(),
@@ -115,13 +109,13 @@ export const schema = z.object({
   target: z.string(),
   limit: z.string(),
   reviewer: z.string(),
-})
+});
 
 // Create a separate component for the drag handle
 function DragHandle({ id }: { id: number }) {
   const { attributes, listeners } = useSortable({
     id,
-  })
+  });
 
   return (
     <Button
@@ -134,9 +128,16 @@ function DragHandle({ id }: { id: number }) {
       <IconGripVertical className="text-muted-foreground size-3" />
       <span className="sr-only">Drag to reorder</span>
     </Button>
-  )
+  );
 }
-const pendingApprovalColumns: ColumnDef<any>[] = [
+interface PendingApprovalData {
+  id: number;
+  name: string;
+  email: string;
+  [key: string]: unknown;
+}
+
+const pendingApprovalColumns: ColumnDef<PendingApprovalData>[] = [
   {
     id: "drag",
     header: () => null,
@@ -171,19 +172,13 @@ const pendingApprovalColumns: ColumnDef<any>[] = [
   {
     accessorKey: "name",
     header: "Nombre",
-    cell: ({ row }) => (
-      <div className="font-medium">
-        {row.original.name}
-      </div>
-    ),
+    cell: ({ row }) => <div className="font-medium">{row.original.name}</div>,
   },
   {
     accessorKey: "email",
     header: "Email",
     cell: ({ row }) => (
-      <div className="text-muted-foreground">
-        {row.original.email}
-      </div>
+      <div className="text-muted-foreground">{row.original.email}</div>
     ),
   },
   {
@@ -198,7 +193,9 @@ const pendingApprovalColumns: ColumnDef<any>[] = [
     accessorKey: "status",
     header: "Estado",
     cell: ({ row }) => (
-      <Badge variant={row.original.status === "active" ? "default" : "destructive"}>
+      <Badge
+        variant={row.original.status === "active" ? "default" : "destructive"}
+      >
         {row.original.status === "active" ? (
           <div className="flex items-center gap-1">
             <IconCircleCheckFilled className="h-3 w-3 fill-green-500" />
@@ -215,13 +212,13 @@ const pendingApprovalColumns: ColumnDef<any>[] = [
   },
   {
     id: "actions",
-    cell: ({ row }) => (
+    cell: () => (
       <div className="w-full flex justify-center items-center">
         <Button
           variant="outline"
           size="sm"
           className="h-8 text-green-600 hover:bg-green-50 hover:text-green-700"
-        // onClick={() => handleApprove(row.original.id)}
+          // onClick={() => handleApprove(row.original.id)}
         >
           Aceptar
         </Button>
@@ -229,17 +226,23 @@ const pendingApprovalColumns: ColumnDef<any>[] = [
           variant="outline"
           size="sm"
           className="h-8 text-red-600 hover:bg-red-50 hover:text-red-700"
-        // onClick={() => handleReject(row.original.id)}
+          // onClick={() => handleReject(row.original.id)}
         >
           Rechazar
         </Button>
       </div>
     ),
   },
+];
 
-]
+interface EmployeeData {
+  id: number;
+  name: string;
+  email: string;
+  [key: string]: unknown;
+}
 
-const employeeDirectoryColumns: ColumnDef<any>[] = [
+const employeeDirectoryColumns: ColumnDef<EmployeeData>[] = [
   {
     id: "drag",
     header: () => null,
@@ -274,19 +277,13 @@ const employeeDirectoryColumns: ColumnDef<any>[] = [
   {
     accessorKey: "name",
     header: "Nombre",
-    cell: ({ row }) => (
-      <div className="font-medium">
-        {row.original.name}
-      </div>
-    ),
+    cell: ({ row }) => <div className="font-medium">{row.original.name}</div>,
   },
   {
     accessorKey: "email",
     header: "Email",
     cell: ({ row }) => (
-      <div className="text-muted-foreground">
-        {row.original.email}
-      </div>
+      <div className="text-muted-foreground">{row.original.email}</div>
     ),
   },
   {
@@ -301,7 +298,9 @@ const employeeDirectoryColumns: ColumnDef<any>[] = [
     accessorKey: "status",
     header: "Estado",
     cell: ({ row }) => (
-      <Badge variant={row.original.status === "active" ? "default" : "destructive"}>
+      <Badge
+        variant={row.original.status === "active" ? "default" : "destructive"}
+      >
         {row.original.status === "active" ? (
           <div className="flex items-center gap-1">
             <IconCircleCheckFilled className="h-3 w-3 fill-green-500" />
@@ -341,17 +340,17 @@ const employeeDirectoryColumns: ColumnDef<any>[] = [
       </DropdownMenu>
     ),
   },
-]
+];
 const columnTranslations: Record<string, string> = {
-  'select': 'Selección',
-  'name': 'Nombre',
-  'email': 'Correo electrónico',
-  'department': 'Departamento',
-  'position': 'Puesto',
-  'status': 'Estado',
-  'registrationDate': 'Fecha de registro',
-  'actions': 'Acciones',
-  'drag': 'Arrastrar',
+  select: "Selección",
+  name: "Nombre",
+  email: "Correo electrónico",
+  department: "Departamento",
+  position: "Puesto",
+  status: "Estado",
+  registrationDate: "Fecha de registro",
+  actions: "Acciones",
+  drag: "Arrastrar",
   // Agrega más traducciones según necesites
 };
 const columns: ColumnDef<z.infer<typeof schema>>[] = [
@@ -390,7 +389,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     accessorKey: "header",
     header: "Header",
     cell: ({ row }) => {
-      return <TableCellViewer item={row.original} />
+      return <TableCellViewer item={row.original} />;
     },
     enableHiding: false,
   },
@@ -425,12 +424,12 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     cell: ({ row }) => (
       <form
         onSubmit={(e) => {
-          e.preventDefault()
+          e.preventDefault();
           toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
             loading: `Saving ${row.original.header}`,
             success: "Done",
             error: "Error",
-          })
+          });
         }}
       >
         <Label htmlFor={`${row.original.id}-target`} className="sr-only">
@@ -450,12 +449,12 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     cell: ({ row }) => (
       <form
         onSubmit={(e) => {
-          e.preventDefault()
+          e.preventDefault();
           toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
             loading: `Saving ${row.original.header}`,
             success: "Done",
             error: "Error",
-          })
+          });
         }}
       >
         <Label htmlFor={`${row.original.id}-limit`} className="sr-only">
@@ -473,10 +472,10 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     accessorKey: "reviewer",
     header: "Reviewer",
     cell: ({ row }) => {
-      const isAssigned = row.original.reviewer !== "Assign reviewer"
+      const isAssigned = row.original.reviewer !== "Assign reviewer";
 
       if (isAssigned) {
-        return row.original.reviewer
+        return row.original.reviewer;
       }
 
       return (
@@ -500,7 +499,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
             </SelectContent>
           </Select>
         </>
-      )
+      );
     },
   },
   {
@@ -527,12 +526,12 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
       </DropdownMenu>
     ),
   },
-]
+];
 
-function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
+function DraggableRow({ row }: { row: Row<Record<string, unknown>> }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
-    id: row.original.id,
-  })
+    id: row.original.id as number,
+  });
 
   return (
     <TableRow
@@ -551,59 +550,66 @@ function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
         </TableCell>
       ))}
     </TableRow>
-  )
+  );
 }
 
 interface DataTableProps {
-  employeeData: any[];
-  pendingApprovalData: any[];
+  employeeData: Record<string, unknown>[];
+  pendingApprovalData: Record<string, unknown>[];
 }
 export function DataTable({
   employeeData,
-  pendingApprovalData
+  pendingApprovalData,
 }: DataTableProps) {
   const [activeTab, setActiveTab] = React.useState("focus-documents");
   const [data, setData] = React.useState(employeeData); // Inicialmente muestra employeeData
   const [rowSelection, setRowSelection] = React.useState({});
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] =
+    React.useState<VisibilityState>({});
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    []
+  );
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
     pageSize: 10,
   });
-  const sortableId = React.useId()
+  const sortableId = React.useId();
   const sensors = useSensors(
     useSensor(MouseSensor, {}),
     useSensor(TouchSensor, {}),
     useSensor(KeyboardSensor, {})
-  )
+  );
   React.useEffect(() => {
-    setData(activeTab === "focus-documents" ? employeeData : pendingApprovalData);
+    setData(
+      activeTab === "focus-documents" ? employeeData : pendingApprovalData
+    );
     // Resetear la paginación al cambiar de pestaña
-    setPagination(prev => ({ ...prev, pageIndex: 0 }));
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
   }, [activeTab, employeeData, pendingApprovalData]);
   // Determinar qué columnas usar según la pestaña activa
   const currentColumns = React.useMemo(() => {
-    return activeTab === "focus-documents" ? employeeDirectoryColumns : pendingApprovalColumns;
+    return activeTab === "focus-documents"
+      ? employeeDirectoryColumns
+      : pendingApprovalColumns;
   }, [activeTab]);
 
   const dataIds = React.useMemo<UniqueIdentifier[]>(
-    () => data?.map(({ id }) => id) || [],
+    () => data?.map(({ id }) => id as number) || [],
     [data]
-  )
-const glass: React.CSSProperties = {
-  background: "rgba(0, 0, 0, 0.81)",
-  borderRadius: "16px",
-  boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)",
-  backdropFilter: "blur(16.4px)",
-  WebkitBackdropFilter: "blur(16.4px)",
-  border: "1px solid rgba(0, 0, 0, 0.3)",
-};
+  );
+  const glass: React.CSSProperties = {
+    background: "rgba(0, 0, 0, 0.81)",
+    borderRadius: "16px",
+    boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)",
+    backdropFilter: "blur(16.4px)",
+    WebkitBackdropFilter: "blur(16.4px)",
+    border: "1px solid rgba(0, 0, 0, 0.3)",
+  };
 
   const table = useReactTable({
     data,
-    columns: currentColumns, // Usar las columnas correspondientes
+    columns: currentColumns as ColumnDef<Record<string, unknown>>[],
     state: {
       sorting,
       columnVisibility,
@@ -611,7 +617,7 @@ const glass: React.CSSProperties = {
       columnFilters,
       pagination,
     },
-    getRowId: (row) => row.id.toString(),
+    getRowId: (row) => (row.id as number).toString(),
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
@@ -624,22 +630,21 @@ const glass: React.CSSProperties = {
     getSortedRowModel: getSortedRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
-  })
+  });
 
   function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
+    const { active, over } = event;
     if (active && over && active.id !== over.id) {
       setData((data) => {
-        const oldIndex = dataIds.indexOf(active.id)
-        const newIndex = dataIds.indexOf(over.id)
-        return arrayMove(data, oldIndex, newIndex)
-      })
+        const oldIndex = dataIds.indexOf(active.id);
+        const newIndex = dataIds.indexOf(over.id);
+        return arrayMove(data, oldIndex, newIndex);
+      });
     }
   }
 
   return (
     <div className="w-full min-h-[87vh] gap-4">
-
       <Tabs
         defaultValue="focus-documents"
         className="w-full flex-col h-full justify-start gap-6"
@@ -660,15 +665,21 @@ const glass: React.CSSProperties = {
               </SelectTrigger>
             </Select>
             <TabsList className="**:data-[slot=badge]:bg-muted-foreground/3 hidden **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:px-1 @4xl/main:flex">
-              <TabsTrigger value="focus-documents">Directorio de Empleados</TabsTrigger>
-              <TabsTrigger value="outline">Pendientes de Aprobación</TabsTrigger>
+              <TabsTrigger value="focus-documents">
+                Directorio de Empleados
+              </TabsTrigger>
+              <TabsTrigger value="outline">
+                Pendientes de Aprobación
+              </TabsTrigger>
             </TabsList>
             <div className="flex items-center gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm">
                     <IconLayoutColumns />
-                    <span className="hidden lg:inline">Personalizar columnas</span>
+                    <span className="hidden lg:inline">
+                      Personalizar columnas
+                    </span>
                     <span className="lg:hidden">Columnas</span>
                     <IconChevronDown />
                   </Button>
@@ -683,7 +694,8 @@ const glass: React.CSSProperties = {
                     )
                     .map((column) => {
                       // Obtener la traducción o usar el ID si no hay traducción
-                      const columnName = columnTranslations[column.id] || column.id;
+                      const columnName =
+                        columnTranslations[column.id] || column.id;
 
                       return (
                         <DropdownMenuCheckboxItem
@@ -696,14 +708,12 @@ const glass: React.CSSProperties = {
                         >
                           {columnName}
                         </DropdownMenuCheckboxItem>
-                      )
+                      );
                     })}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </div>
-
-
         </div>
         <div className="w-full flex-1 overflow-y-auto">
           <TabsContent
@@ -728,11 +738,11 @@ const glass: React.CSSProperties = {
                               {header.isPlaceholder
                                 ? null
                                 : flexRender(
-                                  header.column.columnDef.header,
-                                  header.getContext()
-                                )}
+                                    header.column.columnDef.header,
+                                    header.getContext()
+                                  )}
                             </TableHead>
-                          )
+                          );
                         })}
                       </TableRow>
                     ))}
@@ -784,11 +794,11 @@ const glass: React.CSSProperties = {
                               {header.isPlaceholder
                                 ? null
                                 : flexRender(
-                                  header.column.columnDef.header,
-                                  header.getContext()
-                                )}
+                                    header.column.columnDef.header,
+                                    header.getContext()
+                                  )}
                             </TableHead>
-                          )
+                          );
                         })}
                       </TableRow>
                     ))}
@@ -833,10 +843,15 @@ const glass: React.CSSProperties = {
                 <Select
                   value={`${table.getState().pagination.pageSize}`}
                   onValueChange={(value) => {
-                    table.setPageSize(Number(value))
+                    table.setPageSize(Number(value));
                   }}
                 >
-                  <SelectTrigger size="sm" className="w-20" id="rows-per-page" style={glass}>
+                  <SelectTrigger
+                    size="sm"
+                    className="w-20"
+                    id="rows-per-page"
+                    style={glass}
+                  >
                     <SelectValue
                       placeholder={table.getState().pagination.pageSize}
                     />
@@ -900,7 +915,7 @@ const glass: React.CSSProperties = {
         </div>
       </Tabs>
     </div>
-  )
+  );
 }
 
 const chartData = [
@@ -910,7 +925,7 @@ const chartData = [
   { month: "April", desktop: 73, mobile: 190 },
   { month: "May", desktop: 209, mobile: 130 },
   { month: "June", desktop: 214, mobile: 140 },
-]
+];
 
 const chartConfig = {
   desktop: {
@@ -921,10 +936,10 @@ const chartConfig = {
     label: "Mobile",
     color: "var(--primary)",
   },
-} satisfies ChartConfig
+} satisfies ChartConfig;
 
 function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
-  const isMobile = useIsMobile()
+  const isMobile = useIsMobile();
 
   return (
     <Drawer direction={isMobile ? "bottom" : "right"}>
@@ -1079,5 +1094,5 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
         </DrawerFooter>
       </DrawerContent>
     </Drawer>
-  )
+  );
 }
