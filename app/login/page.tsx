@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { useAuth } from '@/app/hooks/useAuth'
 import styles from './login.module.css'
-import "../ui/globals.css";
-import Spinner from '../ui/spinner/spinner';
+import "../../app/globals.css";
+import { useAuth } from '@/hooks/useAuth';
+import Spinner from '@/components/ui/spinner';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');

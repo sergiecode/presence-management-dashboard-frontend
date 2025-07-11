@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import "../app/ui/globals.css";
+import "../app/globals.css";
 import { Montserrat, Mukta } from 'next/font/google';
+import { ThemeProvider } from "next-themes";
 
 const montserrat = Montserrat({
   subsets: ['latin'],
@@ -25,9 +26,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html>
+    <html lang="es" suppressHydrationWarning>
       <body style={{ fontFamily: 'var(--font-montserrat)' }} className={`${montserrat.variable} ${mukta.variable}`}>
-        {children}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

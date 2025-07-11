@@ -1,0 +1,197 @@
+.page {
+  position: fixed;
+  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  min-height: 100vh;
+  z-index: 9;
+  overflow-x: hidden;
+  background: rgba(24, 22, 22, 0.842);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.loader {
+
+  position: absolute;
+  top: calc(50% - 75px);
+  left: calc(50% - 75px);
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  perspective: 800px;
+}
+
+.loadContainer {
+  --loaderSize: 100px;
+}
+
+.loadCircle {
+  --loaderSpeed: 1.4s;
+}
+
+.loadCircleInner {
+  --border-thickness: 5px;
+  --loader-base-color: 255, 255, 255;
+}
+
+.loadContainer {
+  position: relative;
+  width: var(--loaderSize);
+  height: var(--loaderSize);
+}
+
+.loadInner {
+  width: 82.5%;
+  height: 85%;
+  border-radius: 100%;
+  position: absolute;
+  top: 7.5%;
+  left: 7.25%;
+  box-shadow: 0 0 40px 0 rgba(255, 255, 255, 0.616);
+}
+
+.loadCircle {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+}
+
+.loadCircle>.loadCircleInner {
+  width: 100%;
+  height: 100%;
+  border-radius: 100%;
+  border: var(--border-thickness) solid rgba(var(--loader-base-color), 0.7);
+  border-right: none;
+  border-top: none;
+  background-clip: padding;
+  box-shadow: inset 0px 0px 10px rgba(var(--loader-base-color), 0.15);
+}
+
+.loadCircle:nth-of-type(0) {
+  transform: rotate(0deg);
+  -o-transform: rotate(0deg);
+  -ms-transform: rotate(0deg);
+  -webkit-transform: rotate(0deg);
+  -moz-transform: rotate(0deg);
+}
+
+.loadCircle:nth-of-type(0) .loadCircleInner {
+  animation: loaderSpin var(--loaderSpeed) infinite linear;
+  -o-animation: loaderSpin var(--loaderSpeed) infinite linear;
+  -ms-animation: loaderSpin var(--loaderSpeed) infinite linear;
+  -webkit-animation: loaderSpin var(--loaderSpeed) infinite linear;
+  -moz-animation: loaderSpin var(--loaderSpeed) infinite linear;
+}
+
+.loadCircle:nth-of-type(1) {
+  transform: rotate(70deg);
+  -o-transform: rotate(70deg);
+  -ms-transform: rotate(70deg);
+  -webkit-transform: rotate(70deg);
+  -moz-transform: rotate(70deg);
+}
+
+.loadCircle:nth-of-type(1) .loadCircleInner {
+  animation: loaderSpin var(--loaderSpeed) infinite linear;
+  -o-animation: loaderSpin var(--loaderSpeed) infinite linear;
+  -ms-animation: loaderSpin var(--loaderSpeed) infinite linear;
+  -webkit-animation: loaderSpin var(--loaderSpeed) infinite linear;
+  -moz-animation: loaderSpin var(--loaderSpeed) infinite linear;
+}
+
+.loadCircle:nth-of-type(2) {
+  transform: rotate(140deg);
+  -o-transform: rotate(140deg);
+  -ms-transform: rotate(140deg);
+  -webkit-transform: rotate(140deg);
+  -moz-transform: rotate(140deg);
+}
+
+.loadCircle:nth-of-type(2) .loadCircleInner {
+  animation: loaderSpin var(--loaderSpeed) infinite linear;
+  -o-animation: loaderSpin var(--loaderSpeed) infinite linear;
+  -ms-animation: loaderSpin var(--loaderSpeed) infinite linear;
+  -webkit-animation: loaderSpin var(--loaderSpeed) infinite linear;
+  -moz-animation: loaderSpin var(--loaderSpeed) infinite linear;
+}
+
+.loadInner {
+  animation: loaderSpin (var(--loaderSpeed)*2.5) infinite linear;
+  -o-animation: loaderSpin (var(--loaderSpeed)*2.5) infinite linear;
+  -ms-animation: loaderSpin (var(--loaderSpeed)*2.5) infinite linear;
+  -webkit-animation: loaderSpin (var(--loaderSpeed)*2.5) infinite linear;
+  -moz-animation: loaderSpin (var(--loaderSpeed)*2.5) infinite linear;
+}
+
+@keyframes loaderSpin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@-o-keyframes loaderSpin {
+  from {
+    -o-transform: rotate(0deg);
+  }
+
+  to {
+    -o-transform: rotate(360deg);
+  }
+}
+
+@-ms-keyframes loaderSpin {
+  from {
+    -ms-transform: rotate(0deg);
+  }
+
+  to {
+    -ms-transform: rotate(360deg);
+  }
+}
+
+@-webkit-keyframes loaderSpin {
+  from {
+    -webkit-transform: rotate(0deg);
+  }
+
+  to {
+    -webkit-transform: rotate(360deg);
+  }
+}
+
+@-moz-keyframes loaderSpin {
+  from {
+    -moz-transform: rotate(0deg);
+  }
+
+  to {
+    -moz-transform: rotate(360deg);
+  }
+}
+
+@keyframes elasticPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+  80% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.elasticPopIn {
+  animation: elasticPopIn 0.7s ease-out forwards;
+}

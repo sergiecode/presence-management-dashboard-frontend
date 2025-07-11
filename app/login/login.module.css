@@ -107,6 +107,7 @@
 }
 
 .imgLogo {
+  margin-top: .8rem;
   width: 85%;
   object-fit: cover;
 }

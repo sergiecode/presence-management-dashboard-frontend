@@ -1,7 +1,12 @@
-const Dashboard = () => {
-  return (
-    <div>Dashboard</div>
-  )
-}
+'use client';
 
-export default Dashboard
+import { SectionCards } from "@/components/section-cards";
+
+
+export default function Dashboard() {
+  return (
+    <div className="flex flex-col gap-4 h-full">
+      <SectionCards />
+    </div>
+  );
+}
