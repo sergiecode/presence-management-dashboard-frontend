@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
   IconCalendar,
   IconChartBar,
@@ -8,14 +8,13 @@ import {
   IconHome,
   IconListDetails,
   IconReport,
-  IconSearch,
   IconSettings,
   IconUsers,
-} from "@tabler/icons-react"
+} from "@tabler/icons-react";
 
-import { NavMain } from "@/components/nav-main"
-import { NavSecondary } from "@/components/nav-secondary"
-import { NavUser } from "@/components/nav-user"
+import { NavMain } from "@/components/nav-main";
+import { NavSecondary } from "@/components/nav-secondary";
+import { NavUser } from "@/components/nav-user";
 import {
   Sidebar,
   SidebarContent,
@@ -24,78 +23,72 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
-import { useAuth } from "@/hooks/useAuth"
+} from "@/components/ui/sidebar";
+import { useAuth } from "@/hooks/useAuth";
 import styles from "./sidebar.module.css";
 
-interface NavItem {
-  title: string;
-  url: string;
-  icon: React.ElementType;
-}
-
-interface NavMainProps {
-  items: NavItem[];
-}
-
-const data = {
-  user: {
-    name: "Matias Flamini",
-    email: "mati@absti.com",
-    avatar: "/avatars/shadcn.jpg",
+const navMain = [
+  {
+    title: "Panel Principal",
+    url: "/dashboard",
+    icon: IconHome,
   },
-  navMain: [
-    {
-      title: "Panel Principal",
-      url: "/dashboard",
-      icon: IconHome,
-    },
-    {
-      title: "Asistencia",
-      url: "/dashboard/attendance",
-      icon: IconListDetails,
-    },
-    {
-      title: "Empleados",
-      url: "/dashboard/employees",
-      icon: IconChartBar,
-    },
-    {
-      title: "Reportes",
-      url: "/dashboard/reports",
-      icon: IconReport,
-    },
-    {
-      title: "Gestion de Licencias",
-      url: "/dashboard/leave-management",
-      icon: IconCalendar,
-    },
-    {
-      title: "Registros de Auditoria",
-      url: "/dashboard/audit-logs",
-      icon: IconFolder,
-    },
-    {
-      title: "Equipos",
-      url: "/dashboard/teams",
-      icon: IconUsers,
-    },
-  ],
-  navSecondary: [
-    {
-      title: "Configuración",
-      url: "#",
-      icon: IconSettings,
-    },
-    // {
-    //   title: "Search",
-    //   url: "#",
-    //   icon: IconSearch,
-    // },
-  ]
-}
+  {
+    title: "Asistencia",
+    url: "/dashboard/attendance",
+    icon: IconListDetails,
+  },
+  {
+    title: "Empleados",
+    url: "/dashboard/employees",
+    icon: IconChartBar,
+  },
+  {
+    title: "Reportes",
+    url: "/dashboard/reports",
+    icon: IconReport,
+  },
+  {
+    title: "Gestion de Licencias",
+    url: "/dashboard/leave-management",
+    icon: IconCalendar,
+  },
+  {
+    title: "Registros de Auditoria",
+    url: "/dashboard/audit-logs",
+    icon: IconFolder,
+  },
+  {
+    title: "Equipos",
+    url: "/dashboard/teams",
+    icon: IconUsers,
+  },
+];
+
+const navSecondary = [
+  {
+    title: "Configuración",
+    url: "#",
+    icon: IconSettings,
+  },
+];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { user } = useAuth();
+
+  // Si no hay usuario, mostrar datos por defecto
+  const userData = user
+    ? {
+        name: user.name,
+        email: user.email,
+        avatar: user.picture || "/avatars/default.jpg",
+      }
+    : {
+        name: "Usuario",
+        email: "usuario@ejemplo.com",
+        avatar: "/avatars/default.jpg",
+      };
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -114,12 +107,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+        <NavMain items={navMain} />
+        <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser userS={data.user} />
+        <NavUser userS={userData} />
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }

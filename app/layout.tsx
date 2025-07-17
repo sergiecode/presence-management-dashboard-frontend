@@ -1,18 +1,19 @@
 import type { Metadata } from "next";
 import "../app/globals.css";
-import { Montserrat, Mukta } from 'next/font/google';
+import { Montserrat, Mukta } from "next/font/google";
 import { ThemeProvider } from "next-themes";
+import { UserProvider } from "./contexts/UserContext";
 
 const montserrat = Montserrat({
-  subsets: ['latin'],
-  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
-  variable: '--font-montserrat',
+  subsets: ["latin"],
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+  variable: "--font-montserrat",
 });
 
 const mukta = Mukta({
-  subsets: ['latin'],
-  weight: ['200', '300', '400', '500', '600', '700', '800'],
-  variable: '--font-mukta',
+  subsets: ["latin"],
+  weight: ["200", "300", "400", "500", "600", "700", "800"],
+  variable: "--font-mukta",
 });
 
 export const metadata: Metadata = {
@@ -27,15 +28,20 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" suppressHydrationWarning>
-      <body style={{ fontFamily: 'var(--font-montserrat)' }} className={`${montserrat.variable} ${mukta.variable}`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-        </ThemeProvider>
+      <body
+        style={{ fontFamily: "var(--font-montserrat)" }}
+        className={`${montserrat.variable} ${mukta.variable}`}
+      >
+        <UserProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            {children}
+          </ThemeProvider>
+        </UserProvider>
       </body>
     </html>
   );
