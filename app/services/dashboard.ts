@@ -1,198 +1,434 @@
 // services/dashboard.ts
 
-const API_BASE_URL = "/api/dashboard";
+import {
+  CreateUserData,
+  UpdateUserData,
+  CreateCheckinData,
+  CheckoutData,
+  CreateAbsenceData,
+  CreateTeamData,
+  UpdateTeamData,
+} from "../types/api";
 
-// Función helper para hacer peticiones autenticadas
-async function authenticatedFetch(url: string, options: RequestInit = {}) {
-  const token = localStorage.getItem("user")
-    ? JSON.parse(localStorage.getItem("user")!).token
-    : null;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
-  console.log("🔐 authenticatedFetch - URL:", url);
-  console.log("🔐 authenticatedFetch - Token presente:", !!token);
+export async function authenticatedFetch(
+  endpoint: string,
+  options: RequestInit = {}
+) {
+  const token = localStorage.getItem("accessToken");
 
   if (!token) {
-    throw new Error("No se encontró token de autenticación");
+    throw new Error("No access token found");
   }
 
-  const response = await fetch(url, {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
       ...options.headers,
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
     },
   });
 
-  console.log("🌐 Response status:", response.status);
-  console.log("🌐 Response statusText:", response.statusText);
-
   if (!response.ok) {
-    const errorText = await response.text();
-    console.error("❌ Response error:", errorText);
-    throw new Error(
-      `Error ${response.status}: ${response.statusText} - ${errorText}`
-    );
+    throw new Error(`HTTP error! status: ${response.status}`);
   }
 
-  const jsonResponse = await response.json();
-  console.log("✅ JSON response:", jsonResponse);
-  return jsonResponse;
+  return response.json();
 }
 
-// Servicios para el dashboard
-export const dashboardService = {
-  // Obtener estadísticas de ausencias
-  async getAbsences(startDate?: string, endDate?: string) {
-    const params = new URLSearchParams();
-    if (startDate) params.append("startDate", startDate);
-    if (endDate) params.append("endDate", endDate);
+// Dashboard Summary APIs
+export async function getDashboardSummary() {
+  const today = new Date().toISOString().split("T")[0]; // Formato YYYY-MM-DD
+  const params = new URLSearchParams({ date: today });
+  return authenticatedFetch(
+    `/api/dashboard/attendance/daily-summary?${params.toString()}`
+  );
+}
 
-    return authenticatedFetch(`${API_BASE_URL}/absences?${params}`);
-  },
-
-  // Obtener heatmap de analíticas
-  async getAnalyticsHeatmap() {
-    return authenticatedFetch(`${API_BASE_URL}/analytics/heatmap`);
-  },
-
-  // Obtener analíticas mensuales
-  async getAnalyticsMonthly() {
-    return authenticatedFetch(`${API_BASE_URL}/analytics/monthly`);
-  },
-
-  // Obtener datos de overtime
-  async getAnalyticsOvertime() {
-    return authenticatedFetch(`${API_BASE_URL}/analytics/overtime`);
-  },
-
-  // Obtener predicciones
-  async getAnalyticsPrediction() {
-    return authenticatedFetch(`${API_BASE_URL}/analytics/prediction`);
-  },
-
-  // Obtener logs de auditoría
-  async getAuditLogs(
-    params: {
-      user_email?: string;
-      action?: string;
-      entity_type?: string;
-      entity_id?: number;
-      date?: string;
-      page?: number;
-      page_size?: number;
-    } = {}
-  ) {
-    const queryParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
+export async function getAttendanceStats(filters?: {
+  start_date?: string;
+  end_date?: string;
+  user_id?: number;
+  team_id?: number;
+}) {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined) {
-        queryParams.append(key, value.toString());
+        params.append(key, value.toString());
       }
     });
+  }
+  const queryString = params.toString();
+  return authenticatedFetch(
+    `/api/dashboard/attendance-stats${queryString ? `?${queryString}` : ""}`
+  );
+}
 
-    return authenticatedFetch(`${API_BASE_URL}/audit-logs?${queryParams}`);
-  },
-
-  // Crear check-in
-  async createCheckin(data: {
-    date: string;
-    gps_lat: number;
-    gps_long: number;
-    late_reason?: string;
-    location_detail?: string;
-    location_type: "home" | "office";
-    notes?: string;
-    time: string;
-    user_id: number;
-  }) {
-    return authenticatedFetch(`${API_BASE_URL}/checkins`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  },
-
-  // Exportar check-ins
-  async exportCheckins(
-    params: {
-      startDate?: string;
-      endDate?: string;
-      userId?: number;
-    } = {}
-  ) {
-    const queryParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
+export async function getAbsenceStats(filters?: {
+  start_date?: string;
+  end_date?: string;
+  team_id?: number;
+}) {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined) {
-        queryParams.append(key, value.toString());
+        params.append(key, value.toString());
       }
     });
+  }
+  const queryString = params.toString();
+  return authenticatedFetch(
+    `/api/dashboard/absence-stats${queryString ? `?${queryString}` : ""}`
+  );
+}
 
-    const token = localStorage.getItem("user")
-      ? JSON.parse(localStorage.getItem("user")!).token
-      : null;
-
-    const response = await fetch(
-      `${API_BASE_URL}/checkins/export?${queryParams}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+// User Management APIs
+export async function getUsers(filters?: {
+  page?: number;
+  limit?: number;
+  role?: string;
+  is_active?: boolean;
+}) {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined) {
+        params.append(key, value.toString());
       }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
-    }
-
-    return response.blob(); // Para descargar el archivo
-  },
-
-  // Ver check-ins
-  async viewCheckins(date: string) {
-    return authenticatedFetch(`${API_BASE_URL}/checkins/view?date=${date}`);
-  },
-
-  // Actualizar check-in
-  async updateCheckin(
-    id: number,
-    data: {
-      date: string;
-      gps_lat: number;
-      gps_long: number;
-      late_reason?: string;
-      location_detail?: string;
-      location_type: "home" | "office";
-      notes?: string;
-      time: string;
-      user_id: number;
-    }
-  ) {
-    return authenticatedFetch(`${API_BASE_URL}/checkins/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
     });
-  },
+  }
+  const queryString = params.toString();
+  return authenticatedFetch(
+    `/api/users/${queryString ? `?${queryString}` : ""}`
+  );
+}
 
-  // Obtener resumen diario
-  async getDailySummary(date: string) {
-    return authenticatedFetch(`${API_BASE_URL}/daily-summary?date=${date}`);
-  },
+export async function createUser(userData: CreateUserData) {
+  return authenticatedFetch("/api/users", {
+    method: "POST",
+    body: JSON.stringify(userData),
+  });
+}
 
-  // Obtener usuarios con paginación
-  async getUsers(page: number = 1, pageSize: number = 100) {
-    const params = new URLSearchParams({
-      page: page.toString(),
-      page_size: pageSize.toString(),
+export async function updateUser(userId: number, userData: UpdateUserData) {
+  return authenticatedFetch(`/api/users/${userId}`, {
+    method: "PUT",
+    body: JSON.stringify(userData),
+  });
+}
+
+export async function deleteUser(userId: number) {
+  return authenticatedFetch(`/api/users/${userId}`, {
+    method: "DELETE",
+  });
+}
+
+// Check-in/Check-out APIs
+export async function getCheckins(filters?: {
+  page?: number;
+  limit?: number;
+  user_id?: number;
+  start_date?: string;
+  end_date?: string;
+  location?: string;
+}) {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined) {
+        params.append(key, value.toString());
+      }
     });
+  }
+  const queryString = params.toString();
+  return authenticatedFetch(
+    `/api/checkins/${queryString ? `?${queryString}` : ""}`
+  );
+}
 
-    console.log("🌐 Llamando a /api/users/ con params:", params.toString());
+export async function createCheckin(checkinData: CreateCheckinData) {
+  return authenticatedFetch("/api/checkins", {
+    method: "POST",
+    body: JSON.stringify(checkinData),
+  });
+}
 
-    try {
-      const result = await authenticatedFetch(`/api/users/?${params}`);
-      console.log("✅ Respuesta de /api/users/:", result);
-      return result;
-    } catch (error) {
-      console.error("❌ Error en getUsers:", error);
-      throw error;
+export async function createCheckout(
+  checkinId: number,
+  checkoutData: CheckoutData
+) {
+  return authenticatedFetch(`/api/checkins/${checkinId}/checkout`, {
+    method: "PUT",
+    body: JSON.stringify(checkoutData),
+  });
+}
+
+// Absence Management APIs
+export async function getAbsences(filters?: {
+  page?: number;
+  limit?: number;
+  user_id?: number;
+  status?: string;
+  start_date?: string;
+  end_date?: string;
+}) {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined) {
+        params.append(key, value.toString());
+      }
+    });
+  }
+  const queryString = params.toString();
+  return authenticatedFetch(
+    `/api/absences${queryString ? `?${queryString}` : ""}`
+  );
+}
+
+export async function createAbsence(absenceData: CreateAbsenceData) {
+  return authenticatedFetch("/api/absences", {
+    method: "POST",
+    body: JSON.stringify(absenceData),
+  });
+}
+
+export async function updateAbsenceStatus(
+  absenceId: number,
+  status: string,
+  notes?: string
+) {
+  return authenticatedFetch(`/api/absences/${absenceId}/status`, {
+    method: "PUT",
+    body: JSON.stringify({ status, notes }),
+  });
+}
+
+// Team Management APIs
+export async function getTeams() {
+  return authenticatedFetch("/api/teams");
+}
+
+export async function createTeam(teamData: CreateTeamData) {
+  return authenticatedFetch("/api/teams", {
+    method: "POST",
+    body: JSON.stringify(teamData),
+  });
+}
+
+export async function updateTeam(teamId: number, teamData: UpdateTeamData) {
+  return authenticatedFetch(`/api/teams/${teamId}`, {
+    method: "PUT",
+    body: JSON.stringify(teamData),
+  });
+}
+
+export async function deleteTeam(teamId: number) {
+  return authenticatedFetch(`/api/teams/${teamId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function getTeamMembers(teamId: number) {
+  return authenticatedFetch(`/api/teams/${teamId}/members`);
+}
+
+export async function addTeamMember(teamId: number, userId: number) {
+  return authenticatedFetch(`/api/teams/${teamId}/members`, {
+    method: "POST",
+    body: JSON.stringify({ user_id: userId }),
+  });
+}
+
+export async function removeTeamMember(teamId: number, userId: number) {
+  return authenticatedFetch(`/api/teams/${teamId}/members/${userId}`, {
+    method: "DELETE",
+  });
+}
+
+// Export APIs
+export async function exportAttendanceReport(filters?: {
+  start_date?: string;
+  end_date?: string;
+  user_id?: number;
+  team_id?: number;
+  format?: "csv" | "excel";
+}) {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined) {
+        params.append(key, value.toString());
+      }
+    });
+  }
+  const queryString = params.toString();
+
+  const token = localStorage.getItem("accessToken");
+  if (!token) {
+    throw new Error("No access token found");
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/dashboard/export/attendance${
+      queryString ? `?${queryString}` : ""
+    }`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     }
-  },
-};
+  );
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  return response.blob();
+}
+
+export async function exportAbsenceReport(filters?: {
+  start_date?: string;
+  end_date?: string;
+  team_id?: number;
+  format?: "csv" | "excel";
+}) {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined) {
+        params.append(key, value.toString());
+      }
+    });
+  }
+  const queryString = params.toString();
+
+  const token = localStorage.getItem("accessToken");
+  if (!token) {
+    throw new Error("No access token found");
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/dashboard/export/absences${
+      queryString ? `?${queryString}` : ""
+    }`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  return response.blob();
+}
+
+// Audit Logs API
+export async function getAuditLogs(filters?: {
+  page?: number;
+  limit?: number;
+  user_email?: string;
+  action?: string;
+  entity_type?: string;
+  entity_id?: number;
+  start_date?: string;
+  end_date?: string;
+}) {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined) {
+        params.append(key, value.toString());
+      }
+    });
+  }
+  const queryString = params.toString();
+  return authenticatedFetch(
+    `/api/audit-logs${queryString ? `?${queryString}` : ""}`
+  );
+}
+
+// Analytics APIs
+export async function getAnalyticsHeatmap(filters?: {
+  start_date?: string;
+  end_date?: string;
+  team_id?: number;
+}) {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined) {
+        params.append(key, value.toString());
+      }
+    });
+  }
+  const queryString = params.toString();
+  return authenticatedFetch(
+    `/api/analytics/heatmap${queryString ? `?${queryString}` : ""}`
+  );
+}
+
+export async function getAnalyticsMonthly(filters?: {
+  year?: number;
+  month?: number;
+  team_id?: number;
+}) {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined) {
+        params.append(key, value.toString());
+      }
+    });
+  }
+  const queryString = params.toString();
+  return authenticatedFetch(
+    `/api/analytics/monthly${queryString ? `?${queryString}` : ""}`
+  );
+}
+
+export async function getAnalyticsOvertime(filters?: {
+  start_date?: string;
+  end_date?: string;
+  user_id?: number;
+  team_id?: number;
+}) {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined) {
+        params.append(key, value.toString());
+      }
+    });
+  }
+  const queryString = params.toString();
+  return authenticatedFetch(
+    `/api/analytics/overtime${queryString ? `?${queryString}` : ""}`
+  );
+}
+
+export async function getAnalyticsPrediction(filters?: {
+  type?: "attendance" | "absence";
+  period?: "week" | "month" | "quarter";
+  team_id?: number;
+}) {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined) {
+        params.append(key, value.toString());
+      }
+    });
+  }
+  const queryString = params.toString();
+  return authenticatedFetch(
+    `/api/analytics/prediction${queryString ? `?${queryString}` : ""}`
+  );
+}

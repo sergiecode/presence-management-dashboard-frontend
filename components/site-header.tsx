@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import { Separator } from "@/components/ui/separator"
-import { SidebarTrigger } from "@/components/ui/sidebar"
-import { usePathname } from "next/navigation"
-import React, { useEffect, useState } from "react"
+import { Separator } from "@/components/ui/separator";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { usePathname } from "next/navigation";
+import React, { useEffect, useState } from "react";
 
 const navMain = [
   { title: "Panel Principal", url: "/dashboard" },
@@ -13,7 +13,7 @@ const navMain = [
   { title: "Gestion de Licencias", url: "/dashboard/leave-management" },
   { title: "Registros de Auditoria", url: "/dashboard/audit-logs" },
   { title: "Equipos", url: "/dashboard/teams" },
-]
+];
 
 export function SiteHeader() {
   const glass: React.CSSProperties = {
@@ -25,7 +25,7 @@ export function SiteHeader() {
     borderLeft: "2px solid rgba(255, 255, 255, 0.3)",
     borderRight: "2px solid rgba(255, 255, 255, 0.3)",
     borderTopLeftRadius: "16px",
-    borderTopRightRadius: "16px"
+    borderTopRightRadius: "16px",
   };
 
   const pathname = usePathname();
@@ -35,8 +35,7 @@ export function SiteHeader() {
     if (!pathname) return;
 
     const sortedNav = [...navMain].sort((a, b) => b.url.length - a.url.length);
-    const currentItem = sortedNav.find(item => pathname.startsWith(item.url));
-    console.log(currentItem);
+    const currentItem = sortedNav.find((item) => pathname.startsWith(item.url));
 
     setTitle(currentItem ? currentItem.title : "Portal RRHH");
   }, [pathname]);
@@ -56,5 +55,5 @@ export function SiteHeader() {
         <div className="ml-auto flex items-center gap-2" />
       </div>
     </header>
-  )
+  );
 }

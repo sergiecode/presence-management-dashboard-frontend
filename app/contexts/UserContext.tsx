@@ -9,6 +9,7 @@ interface UserContextType {
   clearUser: () => void;
   getToken: () => string | undefined;
   isAuthenticated: boolean;
+  loading: boolean;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -21,11 +22,21 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     // Cargar datos del usuario desde localStorage al iniciar
     try {
       const storedUser = localStorage.getItem("user");
-      if (storedUser) {
+      const storedToken = localStorage.getItem("accessToken");
+
+      if (storedUser && storedToken) {
         const userData = JSON.parse(storedUser);
-        if (userData.role === "admin") {
+
+        // Check if it's the new API format (with nested user object) or legacy format
+        const userRole = userData.user?.role || userData.role;
+
+        if (["admin", "hr"].includes(userRole)) {
           setUser(userData);
+        } else {
+          console.error("❌ User role not authorized:", userRole);
         }
+      } else {
+        console.error("❌ No stored user or token found");
       }
     } catch (error) {
       console.error("Error loading user data:", error);
@@ -35,19 +46,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const getToken = () => {
-    return user?.token;
+    return localStorage.getItem("accessToken") || user?.token;
   };
 
   const clearUser = () => {
     setUser(null);
     localStorage.removeItem("user");
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
   };
 
-  const isAuthenticated = !!user && user.role === "admin";
-
-  if (loading) {
-    return null; // O un spinner
-  }
+  const isAuthenticated =
+    !!user && ["admin", "hr"].includes(user.user?.role || user.role);
 
   return (
     <UserContext.Provider
@@ -57,6 +67,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         clearUser,
         getToken,
         isAuthenticated,
+        loading,
       }}
     >
       {children}

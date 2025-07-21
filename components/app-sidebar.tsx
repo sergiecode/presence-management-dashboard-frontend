@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import {
   IconCalendar,
   IconChartBar,
@@ -74,13 +75,19 @@ const navSecondary = [
 ];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { user } = useAuth();
+  const { user, currentUserData } = useAuth();
 
-  // Si no hay usuario, mostrar datos por defecto
-  const userData = user
+  // Priorizar datos de currentUserData (de /api/users/me) sobre datos de login
+  const userData = currentUserData
     ? {
-        name: user.name,
-        email: user.email,
+        name: currentUserData.name || `${currentUserData.first_name || ''} ${currentUserData.last_name || ''}`.trim() || "Usuario",
+        email: currentUserData.email,
+        avatar: currentUserData.picture || "/avatars/default.jpg",
+      }
+    : user
+    ? {
+        name: user.name || `${user.user?.first_name || ''} ${user.user?.last_name || ''}`.trim() || "Usuario",
+        email: user.email || user.user?.email || "usuario@ejemplo.com",
         avatar: user.picture || "/avatars/default.jpg",
       }
     : {
@@ -99,7 +106,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
               <a href="#">
-                <img src="/logo2.png" className={styles.imgLogo} alt="Logo" />
+                <Image 
+                  src="/logo2.png" 
+                  className={styles.imgLogo} 
+                  alt="Logo" 
+                  width={32}
+                  height={32}
+                />
                 <span className="text-base font-semibold">Portal RRHH</span>
               </a>
             </SidebarMenuButton>

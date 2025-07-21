@@ -16,7 +16,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { dashboardService } from "@/app/services/dashboard";
+import { getDashboardSummary, getUsers } from "@/app/services/dashboard";
 
 interface DashboardStats {
   totalEmployees: number;
@@ -43,66 +43,64 @@ export function SectionCards() {
         setLoading(true);
         setError(null);
 
-        console.log("🔍 Iniciando fetch de datos del dashboard...");
-
         // Verificar token de autenticación antes de hacer llamadas
         const userStr = localStorage.getItem("user");
         if (!userStr) {
           throw new Error("No se encontró información de usuario autenticado");
         }
-        
+
         const userData = JSON.parse(userStr);
-        console.log("👤 Usuario autenticado:", userData.email, "Rol:", userData.role);
-        
+
         if (userData.role !== "admin") {
-          throw new Error("Solo los administradores pueden ver estadísticas de usuarios");
+          throw new Error(
+            "Solo los administradores pueden ver estadísticas de usuarios"
+          );
         }
 
         // Obtener usuarios del endpoint real /api/users
-        console.log("📊 Obteniendo usuarios desde /api/users...");
-        const usersResponse = await dashboardService.getUsers(1, 500); // Obtener hasta 500 usuarios
-        console.log("✅ Users API response:", usersResponse);
-        
+        const usersResponse = await getUsers({ page: 1, limit: 500 }); // Obtener hasta 500 usuarios
         // Obtener estadísticas diarias
-        console.log("📅 Obteniendo resumen diario...");
-        const today = new Date().toISOString().split("T")[0];
-        const dailySummaryData = await dashboardService.getDailySummary(today);
-        console.log("✅ Daily summary API response:", dailySummaryData);
+        const dailySummaryData = await getDashboardSummary(); // Usar el nuevo endpoint de daily-summary
 
         // Procesar datos de usuarios reales
-        const users = usersResponse.users || usersResponse.data || usersResponse || [];
-        const totalEmployees = usersResponse.total || usersResponse.totalRecords || users.length || 0;
-        
-        console.log("👥 Usuarios procesados:", {
-          totalUsuarios: totalEmployees,
-          arrayUsuarios: users.length,
-          estructuraRespuesta: Object.keys(usersResponse)
-        });
-        
+        const users =
+          usersResponse.users || usersResponse.data || usersResponse || [];
+        const totalEmployees =
+          usersResponse.total ||
+          usersResponse.totalRecords ||
+          users.length ||
+          0;
+
         // Calcular empleados activos basado en el estado real
-        const activeEmployees = users.filter(
-          (user: { status?: string; is_active?: boolean; active?: boolean }) =>
-            user.status === "active" || user.is_active === true || user.active === true
-        ).length || 0;
-        
+        const activeEmployees =
+          users.filter(
+            (user: {
+              status?: string;
+              is_active?: boolean;
+              active?: boolean;
+            }) =>
+              user.status === "active" ||
+              user.is_active === true ||
+              user.active === true
+          ).length || 0;
+
         // Calcular registros pendientes
-        const pendingRegistrations = users.filter(
-          (user: { status?: string; is_active?: boolean; active?: boolean }) => 
-            user.status === "pending" || user.status === "inactive" || 
-            user.is_active === false || user.active === false
-        ).length || 0;
-        
+        const pendingRegistrations =
+          users.filter(
+            (user: {
+              status?: string;
+              is_active?: boolean;
+              active?: boolean;
+            }) =>
+              user.status === "pending" ||
+              user.status === "inactive" ||
+              user.is_active === false ||
+              user.active === false
+          ).length || 0;
+
         const attendanceRecords = dailySummaryData.total_checkins || 0;
         const productivityRate =
           totalEmployees > 0 ? (attendanceRecords / totalEmployees) * 100 : 0;
-
-        console.log("📈 Estadísticas calculadas:", {
-          totalEmployees,
-          activeEmployees,
-          pendingRegistrations,
-          attendanceRecords,
-          productivityRate
-        });
 
         setStats({
           totalEmployees,
@@ -115,7 +113,6 @@ export function SectionCards() {
         console.error("❌ Error fetching dashboard data:", err);
         setError("Error al cargar los datos del dashboard");
         // TODO: Remover datos hardcoded de fallback
-        console.log("🔄 Usando datos de fallback...");
         setStats({
           totalEmployees: 150, // TODO: Datos mockeados
           activeEmployees: 145, // TODO: Datos mockeados
@@ -186,7 +183,9 @@ export function SectionCards() {
       <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
         <Card className="@container/card" style={glass}>
           <CardHeader>
-            <CardDescription>Total Empleados ✅ (endpoint /api/users)</CardDescription>
+            <CardDescription>
+              Total Empleados ✅ (endpoint /api/users)
+            </CardDescription>
             <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
               {loading ? "..." : stats.totalEmployees}
             </CardTitle>
@@ -249,7 +248,10 @@ export function SectionCards() {
             <div className="line-clamp-1 flex gap-2 font-medium">
               {loading
                 ? "..."
-                : `Pendientes hoy: ${Math.max(0, stats.totalEmployees - stats.attendanceRecords)}`}
+                : `Pendientes hoy: ${Math.max(
+                    0,
+                    stats.totalEmployees - stats.attendanceRecords
+                  )}`}
             </div>
           </CardFooter>
         </Card>
