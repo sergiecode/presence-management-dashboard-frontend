@@ -22,12 +22,11 @@ import {
   Users,
   ChevronLeft,
   ChevronRight,
-  X,
 } from "lucide-react";
 import {
   getCheckinsView,
   getDashboardSummary,
-  exportCheckinsReport,
+  exportAttendanceReport,
   updateCheckin,
   createCheckinForUser,
   getUsers,
@@ -150,7 +149,6 @@ export default function AttendancePage() {
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<
@@ -163,17 +161,8 @@ export default function AttendancePage() {
   // Estados de modales
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showExportModal, setShowExportModal] = useState(false);
   const [editingCheckin, setEditingCheckin] = useState<CheckinRecord | null>(
     null
-  );
-
-  // Estados para exportación
-  const [exportStartDate, setExportStartDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
-  const [exportEndDate, setExportEndDate] = useState(
-    new Date().toISOString().split("T")[0]
   );
 
   // Estados de formularios
@@ -288,7 +277,7 @@ export default function AttendancePage() {
   }, [selectedDate, user, fetchAttendanceData]);
 
   // Funciones de manejo de formularios
-  const handleEditCheckin = useCallback((checkin: CheckinRecord) => {
+  const handleEditCheckin = (checkin: CheckinRecord) => {
     setEditingCheckin(checkin);
     setEditForm({
       notes: checkin.notes,
@@ -301,7 +290,7 @@ export default function AttendancePage() {
       ],
     });
     setShowEditModal(true);
-  }, []);
+  };
 
   const handleCreateCheckin = async () => {
     try {
@@ -314,7 +303,6 @@ export default function AttendancePage() {
         user_id: 0,
       });
       fetchAttendanceData(selectedDate);
-      setSuccessMessage("Check-in creado exitosamente");
     } catch (err) {
       console.error("Error creating checkin:", err);
       setError("Error al crear el registro de asistencia");
@@ -330,7 +318,6 @@ export default function AttendancePage() {
       setEditingCheckin(null);
       setEditForm({});
       fetchAttendanceData(selectedDate);
-      setSuccessMessage("Check-in actualizado exitosamente");
     } catch (err) {
       console.error("Error updating checkin:", err);
       setError("Error al actualizar el registro de asistencia");
@@ -340,24 +327,20 @@ export default function AttendancePage() {
   const handleExport = async () => {
     try {
       setExporting(true);
-      const blob = await exportCheckinsReport({
-        startDate: exportStartDate,
-        endDate: exportEndDate,
-        userId: undefined, // Se puede modificar para exportar un usuario específico
+      const blob = await exportAttendanceReport({
+        start_date: selectedDate,
+        end_date: selectedDate,
+        format: "csv",
       });
 
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `checkins_${exportStartDate}_to_${exportEndDate}.csv`;
+      a.download = `attendance_${selectedDate}.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      setShowExportModal(false);
-      setSuccessMessage(
-        `Datos exportados exitosamente (${exportStartDate} - ${exportEndDate})`
-      );
     } catch (err) {
       console.error("Error exporting data:", err);
       setError("Error al exportar los datos");
@@ -477,7 +460,7 @@ export default function AttendancePage() {
         ),
       }),
     ],
-    [columnHelper, handleEditCheckin]
+    [columnHelper]
   );
 
   const filteredData = useMemo(() => {
@@ -653,7 +636,7 @@ export default function AttendancePage() {
                     <Textarea
                       placeholder="Notas adicionales..."
                       value={createForm.notes}
-                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                      onChange={(e) =>
                         setCreateForm((prev) => ({
                           ...prev,
                           notes: e.target.value,
@@ -687,8 +670,8 @@ export default function AttendancePage() {
             </Button>
             <Button
               variant="outline"
-              onClick={() => setShowExportModal(true)}
-              disabled={exporting}
+              onClick={handleExport}
+              disabled={exporting || checkins.length === 0}
             >
               <Download
                 className={`h-4 w-4 mr-2 ${exporting ? "animate-spin" : ""}`}
@@ -860,28 +843,8 @@ export default function AttendancePage() {
         </CardHeader>
         <CardContent>
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4 flex items-start justify-between">
-              <span>{error}</span>
-              <button
-                onClick={() => setError(null)}
-                className="ml-4 text-red-500 hover:text-red-700 flex-shrink-0 cursor-pointer"
-                aria-label="Cerrar mensaje de error"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          )}
-
-          {successMessage && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-4 flex items-start justify-between">
-              <span>{successMessage}</span>
-              <button
-                onClick={() => setSuccessMessage(null)}
-                className="ml-4 text-green-500 hover:text-green-700 flex-shrink-0 cursor-pointer"
-                aria-label="Cerrar mensaje de éxito"
-              >
-                <X className="h-4 w-4" />
-              </button>
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+              {error}
             </div>
           )}
 
@@ -1000,58 +963,6 @@ export default function AttendancePage() {
         </CardContent>
       </Card>
 
-      {/* Modal de Exportación */}
-      <Dialog open={showExportModal} onOpenChange={setShowExportModal}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Exportar Registros</DialogTitle>
-            <DialogDescription>
-              Selecciona el rango de fechas para exportar los registros de
-              check-ins
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Fecha de Inicio</Label>
-              <Input
-                type="date"
-                value={exportStartDate}
-                onChange={(e) => setExportStartDate(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Fecha de Fin</Label>
-              <Input
-                type="date"
-                value={exportEndDate}
-                onChange={(e) => setExportEndDate(e.target.value)}
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowExportModal(false)}
-              >
-                Cancelar
-              </Button>
-              <Button onClick={handleExport} disabled={exporting}>
-                {exporting ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    Exportando...
-                  </>
-                ) : (
-                  <>
-                    <Download className="h-4 w-4 mr-2" />
-                    Exportar CSV
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Modal de Edición */}
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
         <DialogContent className="sm:max-w-md">
@@ -1123,7 +1034,7 @@ export default function AttendancePage() {
               <Textarea
                 placeholder="Notas adicionales..."
                 value={editForm.notes || ""}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                onChange={(e) =>
                   setEditForm((prev) => ({ ...prev, notes: e.target.value }))
                 }
               />

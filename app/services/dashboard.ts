@@ -47,6 +47,61 @@ export async function getDashboardSummary() {
   );
 }
 
+export async function getUsersStats() {
+  return authenticatedFetch("/api/dashboard/stats/users");
+}
+
+export async function getMonthlyAnalytics(filters?: {
+  page?: number;
+  page_size?: number;
+}) {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined) {
+        params.append(key, value.toString());
+      }
+    });
+  }
+  const queryString = params.toString();
+  return authenticatedFetch(
+    `/api/dashboard/analytics/monthly${queryString ? `?${queryString}` : ""}`
+  );
+}
+
+export async function getOvertimeStats(filters?: {
+  page?: number;
+  page_size?: number;
+}) {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined) {
+        params.append(key, value.toString());
+      }
+    });
+  }
+  const queryString = params.toString();
+  return authenticatedFetch(
+    `/api/dashboard/stats/overtime${queryString ? `?${queryString}` : ""}`
+  );
+}
+
+export async function getAttendanceStatsRange(filters?: {
+  startDate?: string;
+  endDate?: string;
+}) {
+  const params = new URLSearchParams();
+  if (filters) {
+    if (filters.startDate) params.append("startDate", filters.startDate);
+    if (filters.endDate) params.append("endDate", filters.endDate);
+  }
+  const queryString = params.toString();
+  return authenticatedFetch(
+    `/api/dashboard/stats/attendance${queryString ? `?${queryString}` : ""}`
+  );
+}
+
 export async function getAttendanceStats(filters?: {
   start_date?: string;
   end_date?: string;
@@ -148,6 +203,58 @@ export async function getCheckins(filters?: {
   return authenticatedFetch(
     `/api/checkins/${queryString ? `?${queryString}` : ""}`
   );
+}
+
+export async function getCheckinsView(date: string) {
+  const params = new URLSearchParams();
+  params.append("date", date);
+  const queryString = params.toString();
+  return authenticatedFetch(`/api/dashboard/checkins/view?${queryString}`);
+}
+
+export async function getAttendanceIndividual(userId: number, date: string) {
+  const params = new URLSearchParams();
+  params.append("user_id", userId.toString());
+  params.append("date", date);
+  const queryString = params.toString();
+  return authenticatedFetch(
+    `/api/dashboard/attendance/individual?${queryString}`
+  );
+}
+
+export async function updateCheckin(
+  checkinId: number,
+  data: {
+    locations?: Array<{
+      location_type: number;
+      location_detail: string;
+    }>;
+    late_reason?: string;
+    notes?: string;
+    time?: string;
+    user_id?: number;
+  }
+) {
+  return authenticatedFetch(`/api/dashboard/checkins/${checkinId}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function createCheckinForUser(data: {
+  locations: Array<{
+    location_type: number;
+    location_detail: string;
+  }>;
+  late_reason?: string;
+  notes?: string;
+  time: string;
+  user_id: number;
+}) {
+  return authenticatedFetch("/api/dashboard/checkins", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
 }
 
 export async function createCheckin(checkinData: CreateCheckinData) {
@@ -275,6 +382,42 @@ export async function exportAttendanceReport(filters?: {
 
   const response = await fetch(
     `${API_BASE_URL}/api/dashboard/export/attendance${
+      queryString ? `?${queryString}` : ""
+    }`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  return response.blob();
+}
+
+export async function exportCheckinsReport(filters?: {
+  startDate?: string;
+  endDate?: string;
+  userId?: number;
+}) {
+  const params = new URLSearchParams();
+  if (filters) {
+    if (filters.startDate) params.append("startDate", filters.startDate);
+    if (filters.endDate) params.append("endDate", filters.endDate);
+    if (filters.userId) params.append("userId", filters.userId.toString());
+  }
+  const queryString = params.toString();
+
+  const token = localStorage.getItem("accessToken");
+  if (!token) {
+    throw new Error("No access token found");
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/dashboard/export/checkins${
       queryString ? `?${queryString}` : ""
     }`,
     {
@@ -431,4 +574,58 @@ export async function getAnalyticsPrediction(filters?: {
   return authenticatedFetch(
     `/api/analytics/prediction${queryString ? `?${queryString}` : ""}`
   );
+}
+
+// Additional User Management APIs
+export async function getUserById(userId: number) {
+  return authenticatedFetch(`/api/users/${userId}`);
+}
+
+export async function updateUserHrDetails(
+  userId: number,
+  hrData: {
+    birth_date?: string;
+    cuil?: string;
+    dni?: string;
+    hire_date?: string;
+    location?: {
+      calle?: string;
+      ciudad?: string;
+      codigo_postal?: string;
+      numero?: string;
+      pais?: string;
+      piso?: string;
+      provincia?: string;
+      tipo?: number;
+    };
+    monthly_objective_days?: number;
+    notes?: string;
+    office_days?: string;
+    on_site_required?: boolean;
+    team?: string;
+    teams_access?: boolean;
+    weekly_hours?: number;
+    weekly_objective_days?: number;
+    zoho_access?: boolean;
+  }
+) {
+  return authenticatedFetch(`/api/users/${userId}/hr-details`, {
+    method: "PUT",
+    body: JSON.stringify(hrData),
+  });
+}
+
+export async function updateUserCheckinConfig(
+  userId: number,
+  configData: {
+    checkin_start_time?: string;
+    checkout_end_time?: string;
+    notification_offset_min?: number;
+    timezone?: string;
+  }
+) {
+  return authenticatedFetch(`/api/users/${userId}/checkin-config`, {
+    method: "PUT",
+    body: JSON.stringify(configData),
+  });
 }
