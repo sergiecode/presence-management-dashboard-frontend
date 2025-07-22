@@ -45,6 +45,7 @@ export function SectionCards() {
 
         // Verificar token de autenticación antes de hacer llamadas
         const userStr = localStorage.getItem("user");
+
         if (!userStr) {
           throw new Error("No se encontró información de usuario autenticado");
         }
@@ -58,49 +59,35 @@ export function SectionCards() {
         }
 
         // Obtener usuarios del endpoint real /api/users
-        const usersResponse = await getUsers({ page: 1, limit: 500 }); // Obtener hasta 500 usuarios
-        // Obtener estadísticas diarias
-        const dailySummaryData = await getDashboardSummary(); // Usar el nuevo endpoint de daily-summary
+        const usersResponse = await getUsers({}); // Sin filtros para traer todos los usuarios
 
-        // Procesar datos de usuarios reales
-        const users =
-          usersResponse.users || usersResponse.data || usersResponse || [];
+        // TEMPORAL: Comentar getDashboardSummary hasta que el endpoint esté disponible
+        const dailySummaryData = null; // Temporal hasta que el endpoint esté listo
+
+        // Procesar datos de usuarios
+        const users = usersResponse?.data || [];
         const totalEmployees =
-          usersResponse.total ||
-          usersResponse.totalRecords ||
-          users.length ||
-          0;
+          usersResponse?.pagination?.total || users.length || 0;
 
-        // Calcular empleados activos basado en el estado real
-        const activeEmployees =
-          users.filter(
-            (user: {
-              status?: string;
-              is_active?: boolean;
-              active?: boolean;
-            }) =>
-              user.status === "active" ||
-              user.is_active === true ||
-              user.active === true
-          ).length || 0;
+        // Calcular empleados activos basado en el campo 'active'
+        const activeEmployees = users.filter(
+          (user: any) => user.active === true
+        ).length;
 
-        // Calcular registros pendientes
-        const pendingRegistrations =
-          users.filter(
-            (user: {
-              status?: string;
-              is_active?: boolean;
-              active?: boolean;
-            }) =>
-              user.status === "pending" ||
-              user.status === "inactive" ||
-              user.is_active === false ||
-              user.active === false
-          ).length || 0;
+        // Calcular registros pendientes basado en 'pending_approval'
+        const pendingRegistrations = users.filter(
+          (user: any) => user.pending_approval === true
+        ).length;
 
-        const attendanceRecords = dailySummaryData.total_checkins || 0;
+        // Calcular asistencia basada en checkin_start_time (si no está vacío, hizo checkin)
+        const usersWithCheckin = users.filter(
+          (user: any) =>
+            user.checkin_start_time && user.checkin_start_time.trim() !== ""
+        ).length;
+
+        const attendanceRecords = usersWithCheckin;
         const productivityRate =
-          totalEmployees > 0 ? (attendanceRecords / totalEmployees) * 100 : 0;
+          totalEmployees > 0 ? (usersWithCheckin / totalEmployees) * 100 : 0;
 
         setStats({
           totalEmployees,
@@ -111,14 +98,17 @@ export function SectionCards() {
         });
       } catch (err) {
         console.error("❌ Error fetching dashboard data:", err);
-        setError("Error al cargar los datos del dashboard");
-        // TODO: Remover datos hardcoded de fallback
+        setError(
+          `Error al cargar datos: ${
+            err instanceof Error ? err.message : "Error desconocido"
+          }`
+        );
         setStats({
-          totalEmployees: 150, // TODO: Datos mockeados
-          activeEmployees: 145, // TODO: Datos mockeados
-          pendingRegistrations: 3, // TODO: Datos mockeados
-          attendanceRecords: 98, // TODO: Datos mockeados
-          productivityRate: 96.7, // TODO: Datos mockeados
+          totalEmployees: 0,
+          activeEmployees: 0,
+          pendingRegistrations: 0,
+          attendanceRecords: 0,
+          productivityRate: 0,
         });
       } finally {
         setLoading(false);
@@ -183,9 +173,7 @@ export function SectionCards() {
       <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
         <Card className="@container/card" style={glass}>
           <CardHeader>
-            <CardDescription>
-              Total Empleados ✅ (endpoint /api/users)
-            </CardDescription>
+            <CardDescription>Total de Empleados</CardDescription>
             <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
               {loading ? "..." : stats.totalEmployees}
             </CardTitle>
@@ -193,7 +181,7 @@ export function SectionCards() {
           <CardFooter className="flex-col items-start gap-1.5 text-sm">
             <div className="line-clamp-1 flex gap-2 font-medium">
               {error
-                ? "TODO: Usando datos mockeados de fallback"
+                ? "Error al cargar datos"
                 : "Usuarios registrados en el sistema"}
             </div>
           </CardFooter>
@@ -201,9 +189,7 @@ export function SectionCards() {
 
         <Card className="@container/card" style={glass}>
           <CardHeader>
-            <CardDescription>
-              Empleados Activos ✅ (endpoint /api/users)
-            </CardDescription>
+            <CardDescription>Empleados Activos</CardDescription>
             <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
               {loading ? "..." : stats.activeEmployees}
             </CardTitle>
@@ -219,9 +205,7 @@ export function SectionCards() {
 
         <Card className="@container/card" style={glass}>
           <CardHeader>
-            <CardDescription>
-              TODO: Registros Pendientes (sin endpoint de aprobaciones)
-            </CardDescription>
+            <CardDescription>Registros Pendientes</CardDescription>
             <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
               {loading ? "..." : stats.pendingRegistrations}
             </CardTitle>
@@ -229,17 +213,15 @@ export function SectionCards() {
           <CardFooter className="flex-col items-start gap-1.5 text-sm">
             <div className="line-clamp-1 flex gap-2 font-medium">
               {error
-                ? "TODO: Datos mockeados"
-                : "Usuarios inactivos/pendientes"}
+                ? "Error al cargar datos"
+                : "Usuarios con aprobación pendiente"}
             </div>
           </CardFooter>
         </Card>
 
         <Card className="@container/card" style={glass}>
           <CardHeader>
-            <CardDescription>
-              Registros de asistencias ✅ (endpoint daily-summary)
-            </CardDescription>
+            <CardDescription>Registros de Asistencia</CardDescription>
             <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
               {loading ? "..." : stats.attendanceRecords}
             </CardTitle>
@@ -261,9 +243,9 @@ export function SectionCards() {
       <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols gap-4 px-4">
         <Card className="mt-4 w-full" style={glass}>
           <CardHeader className="items-center pb-0">
-            <CardTitle>Distribución de Empleados ✅ (datos reales)</CardTitle>
+            <CardTitle>Distribución de Empleados</CardTitle>
             <CardDescription>
-              Basado en endpoints /api/users y daily-summary ✅
+              Distribución actual por estado de empleados
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-1 pb-0">
@@ -292,7 +274,7 @@ export function SectionCards() {
           </CardContent>
           <CardFooter className="flex-col gap-2 text-sm">
             <div className="text-muted-foreground leading-none">
-              Distribución actual de empleados por estado
+              Resumen visual del estado de empleados
             </div>
           </CardFooter>
         </Card>
