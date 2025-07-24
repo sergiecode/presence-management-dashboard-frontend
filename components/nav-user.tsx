@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  IconCreditCard,
   IconDotsVertical,
   IconLogout,
   IconNotification,
@@ -70,7 +71,7 @@ export function NavUser({
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
                   <AvatarImage src={userS.avatar} alt={userS.name} />
-                  <AvatarFallback className="rounded-lg">MF</AvatarFallback>
+                  <AvatarFallback className="rounded-lg">CN</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{userS.name}</span>
@@ -88,13 +89,13 @@ export function NavUser({
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <IconNotification />
-                Notificaciones
+                Notificiones
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={logout}>
               <IconLogout />
-              Cerrar Sesion
+              Cerrar sesión
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

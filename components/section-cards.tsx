@@ -17,7 +17,6 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { getDashboardSummary, getUsers } from "@/app/services/dashboard";
-
 interface DashboardStats {
   totalEmployees: number;
   activeEmployees: number;
@@ -118,15 +117,6 @@ export function SectionCards() {
     fetchDashboardData();
   }, []);
 
-  const glass: React.CSSProperties = {
-    background: "rgba(0, 0, 0, 0.81)",
-    borderRadius: "16px",
-    boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)",
-    backdropFilter: "blur(16.4px)",
-    WebkitBackdropFilter: "blur(16.4px)",
-    border: "1px solid rgba(0, 0, 0, 0.3)",
-  };
-
   // Datos para el gráfico de pastel basados en datos reales
   const chartData = [
     {
@@ -166,12 +156,11 @@ export function SectionCards() {
       color: "var(--chart-3)",
     },
   } satisfies ChartConfig;
-
   return (
     <div className="flex flex-col gap-4">
       {/* Sección de Cards */}
       <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
-        <Card className="@container/card" style={glass}>
+        <Card className="@container/card">
           <CardHeader>
             <CardDescription>Total de Empleados</CardDescription>
             <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
@@ -187,7 +176,7 @@ export function SectionCards() {
           </CardFooter>
         </Card>
 
-        <Card className="@container/card" style={glass}>
+        <Card className="@container/card">
           <CardHeader>
             <CardDescription>Empleados Activos</CardDescription>
             <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
@@ -203,7 +192,7 @@ export function SectionCards() {
           </CardFooter>
         </Card>
 
-        <Card className="@container/card" style={glass}>
+        <Card className="@container/card">
           <CardHeader>
             <CardDescription>Registros Pendientes</CardDescription>
             <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
@@ -219,7 +208,7 @@ export function SectionCards() {
           </CardFooter>
         </Card>
 
-        <Card className="@container/card" style={glass}>
+        <Card className="@container/card">
           <CardHeader>
             <CardDescription>Registros de Asistencia</CardDescription>
             <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
@@ -241,7 +230,7 @@ export function SectionCards() {
 
       {/* Gráfico de Pastel */}
       <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols gap-4 px-4">
-        <Card className="mt-4 w-full" style={glass}>
+        <Card className="mt-4 w-full">
           <CardHeader className="items-center pb-0">
             <CardTitle>Distribución de Empleados</CardTitle>
             <CardDescription>

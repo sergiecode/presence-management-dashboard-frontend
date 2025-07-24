@@ -4,6 +4,7 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { usePathname } from "next/navigation";
 import React, { useEffect, useState } from "react";
+import { ModeToggle } from "./ui/mode-toggle";
 
 const navMain = [
   { title: "Panel Principal", url: "/dashboard" },
@@ -16,18 +17,6 @@ const navMain = [
 ];
 
 export function SiteHeader() {
-  const glass: React.CSSProperties = {
-    background: "rgba(255, 255, 255, 0.28)",
-    boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)",
-    backdropFilter: "blur(5px)",
-    WebkitBackdropFilter: "blur(5px)",
-    borderTop: "2px solid rgba(255, 255, 255, 0.3)",
-    borderLeft: "2px solid rgba(255, 255, 255, 0.3)",
-    borderRight: "2px solid rgba(255, 255, 255, 0.3)",
-    borderTopLeftRadius: "16px",
-    borderTopRightRadius: "16px",
-  };
-
   const pathname = usePathname();
   const [title, setTitle] = useState("Portal RRHH");
 
@@ -41,11 +30,8 @@ export function SiteHeader() {
   }, [pathname]);
 
   return (
-    <header
-      style={glass}
-      className="flex h-(--header-height) shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)"
-    >
-      <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
+    <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height) py-2">
+      <div className="data-[state=open]:bg-sidebar-accent flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
         <SidebarTrigger className="-ml-1" />
         <Separator
           orientation="vertical"
@@ -53,6 +39,9 @@ export function SiteHeader() {
         />
         <h1 className="text-base font-medium">{title}</h1>
         <div className="ml-auto flex items-center gap-2" />
+      </div>
+      <div className="px-6">
+        <ModeToggle />
       </div>
     </header>
   );

@@ -15,38 +15,20 @@ export default function AuthWrapper({
 }) {
   const { user, loading } = useAuth();
   const router = useRouter();
-
   useEffect(() => {
-    // Si ya cargó y no hay usuario, redirige al login
     if (!loading && !user) {
       router.replace("/login");
     }
   }, [loading, user, router]);
-  const sidebarStyle = {
-    backgroundImage: "url('/fondo2.jpg')",
-    backgroundSize: "cover", // hace que se ajuste sin deformarse
-    backgroundPosition: "center", // centra la imagen
-    backgroundRepeat: "no-repeat", // evita que se repita    "--sidebar-width": "calc(var(--spacing) * 72)",
-    "--header-height": "calc(var(--spacing) * 12)",
-  } as React.CSSProperties;
 
-  const glass: React.CSSProperties = {
-    background: "rgba(255, 255, 255, 0.28)",
-    borderBottomLeftRadius: "16px",
-    borderBottomRightRadius: "16px",
-    boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)",
-    backdropFilter: "blur(5px)",
-    WebkitBackdropFilter: "blur(5px)",
-    border: "2px solid rgba(255, 255, 255, 0.3)",
-  };
   return (
-    <SidebarProvider style={sidebarStyle}>
+    <SidebarProvider>
       <AppSidebar variant="inset" />
-      <SidebarInset className="bg-transparent">
+      <SidebarInset className="dark:bg-sidebar bg-white ">
         <SiteHeader />
-        <div className="flex flex-1 flex-col" style={glass}>
+        <div className="flex flex-1 flex-col ">
           <div className="@container/main flex flex-1 flex-col gap-2">
-            <div className="flex flex-col gap-4 py-6 max-h-[92vh]">
+            <div className="flex flex-col gap-4 py-6 max-h-[92vh] overflow-y-auto">
               {children}
             </div>
           </div>
@@ -55,4 +37,3 @@ export default function AuthWrapper({
     </SidebarProvider>
   );
 }
-<SectionCards />;
