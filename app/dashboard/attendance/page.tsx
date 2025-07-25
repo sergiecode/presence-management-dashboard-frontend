@@ -180,7 +180,7 @@ export default function AttendancePage() {
   const [createForm, setCreateForm] = useState<CreateCheckinData>({
     locations: [{ location_type: 1, location_detail: "" }],
     notes: "",
-    time: new Date().toISOString().slice(0, 16),
+    time: new Date().toISOString(),
     user_id: 0,
   });
   const [editForm, setEditForm] = useState<EditCheckinData>({});
@@ -292,7 +292,7 @@ export default function AttendancePage() {
     setEditingCheckin(checkin);
     setEditForm({
       notes: checkin.notes,
-      time: new Date(checkin.checkin_time).toISOString().slice(0, 16),
+      time: new Date(checkin.checkin_time).toISOString(),
       locations: [
         {
           location_type: checkin.location_type === "office" ? 1 : 2,
@@ -310,7 +310,7 @@ export default function AttendancePage() {
       setCreateForm({
         locations: [{ location_type: 1, location_detail: "" }],
         notes: "",
-        time: new Date().toISOString().slice(0, 16),
+        time: new Date().toISOString(),
         user_id: 0,
       });
       fetchAttendanceData(selectedDate);

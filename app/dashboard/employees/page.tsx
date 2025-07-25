@@ -562,6 +562,7 @@ export default function EmployeesPage() {
 
       const hrDataFormatted = {
         ...hrForm,
+        approve: true,
         birth_date: formatDateForBackend(hrForm.birth_date),
         hire_date: formatDateForBackend(hrForm.hire_date),
       };

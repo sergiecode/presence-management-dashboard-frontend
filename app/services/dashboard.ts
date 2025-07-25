@@ -584,6 +584,7 @@ export async function getUserById(userId: number) {
 export async function updateUserHrDetails(
   userId: number,
   hrData: {
+    approve?: boolean;
     birth_date?: string;
     cuil?: string;
     dni?: string;
