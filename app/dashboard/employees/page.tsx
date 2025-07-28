@@ -553,7 +553,7 @@ export default function EmployeesPage() {
     try {
       // Convertir fechas al formato ISO 8601 que espera el backend
       const formatDateForBackend = (dateStr: string) => {
-        if (!dateStr) return "";
+        if (!dateStr || dateStr.trim() === "") return undefined;
         // Si ya tiene formato de tiempo, devolverlo tal como está
         if (dateStr.includes("T")) return dateStr;
         // Si es solo fecha, agregar tiempo por defecto (mediodía UTC)
@@ -589,7 +589,7 @@ export default function EmployeesPage() {
     try {
       // Función para convertir fechas al formato ISO 8601 que espera el backend
       const formatDateForBackend = (dateStr: string) => {
-        if (!dateStr) return "";
+        if (!dateStr || dateStr.trim() === "") return undefined;
         // Si ya tiene formato de tiempo, devolverlo tal como está
         if (dateStr.includes("T")) return dateStr;
         // Si es solo fecha, agregar tiempo por defecto (mediodía UTC)

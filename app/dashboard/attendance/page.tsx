@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
 import {
   CalendarDays,
   Clock,
@@ -25,14 +26,16 @@ import {
   X,
 } from "lucide-react";
 import {
-  getCheckinsView,
+  getAttendanceSummary,
   getDashboardSummary,
   exportCheckinsReport,
   updateCheckin,
   createCheckinForUser,
   getUsers,
+  getUserById,
 } from "@/app/services/dashboard";
 import { useUser } from "@/app/contexts/UserContext";
+import { LOCATION_TYPE_LABELS, LOCATION_TYPES } from "@/app/constants/enums";
 import {
   Dialog,
   DialogContent,
@@ -69,21 +72,32 @@ import {
 } from "@/components/ui/table";
 
 interface CheckinRecord {
-  checkin_id: number;
   user_id: number;
-  user_name: string;
-  user_email: string;
-  date: string;
+  name: string;
+  email: string;
+  checkin_id: number;
   checkin_time: string;
-  checkout_time?: string;
-  checkout_status?: string;
-  location_type: "home" | "office" | string;
-  location_detail?: string;
-  gps_lat: number;
-  gps_long: number;
   late: boolean;
+  location_type: number | null;
+  location_detail: string | null;
+  locations?: Array<{
+    id: number;
+    checkin_id: number;
+    location_type: number;
+    location_detail: string;
+    created_at: string;
+  }>;
+  notes: string;
+  late_reason: string;
+  checkin_created_at: string;
+  absence_id: number | null;
+  absence_type: string | null;
+  absence_reason: string | null;
+  file_url: string | null;
+  absence_created_at: string | null;
+  checkout_time: string | null;
+  checkout_status: string;
   overtime: boolean;
-  notes?: string;
 }
 
 interface User {
@@ -114,40 +128,88 @@ interface EditCheckinData {
   notes?: string;
   time?: string;
   user_id?: number;
+  userTimezone?: string;
 }
 
-interface DailySummary {
-  date: string;
-  total_checkins: number;
-  on_time: number;
-  late: number;
-  absent: number;
-  unique_users: number;
-  overtime?: number;
-}
 
-interface APIDailySummary {
-  date: string;
-  total_checkins: number;
-  total_on_time: number;
-  total_late: number;
-  total_overtime: number;
-  created_at: string;
-  updated_at: string;
+
+interface LiveStats {
+  absent_today: number;
+  attendance_rate: number;
+  present_today: number;
+  total_employees: number;
 }
 
 export default function AttendancePage() {
   const { user } = useUser();
 
+  // Utility function to format time in user's timezone
+  const formatTimeInUserTimezone = (timeString: string | null, fallback = "-") => {
+    if (!timeString) return fallback;
+    
+    try {
+      // Default to Argentina timezone if user timezone is not set
+      const userTimezone = (user as { timezone?: string })?.timezone || "America/Argentina/Buenos_Aires";
+      
+      const date = new Date(timeString);
+      
+      return date.toLocaleTimeString("es-ES", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: userTimezone,
+      });
+    } catch (error) {
+      console.error("Error formatting time:", error, "Time string:", timeString);
+      return fallback;
+    }
+  };
+
+  // Helper function to check if a time is late (after 8:00 AM)
+  const isTimeLate = (timeStr: string): boolean => {
+    if (!timeStr) return false;
+    try {
+      const date = new Date(timeStr);
+      const hours = date.getHours();
+      const minutes = date.getMinutes();
+      const totalMinutes = hours * 60 + minutes;
+      const lateThreshold = 8 * 60; // 8:00 AM in minutes
+      return totalMinutes > lateThreshold;
+    } catch (error) {
+      console.error("Error checking if time is late:", error);
+      return false;
+    }
+  };
+
+  // Utility function to format time for backend with timezone info
+  const formatTimeForBackend = (timeStr: string) => {
+    if (!timeStr) return timeStr;
+    
+    // Parse the local time string (e.g., "2025-07-28T07:55")
+    const localDate = new Date(timeStr);
+    
+    // For "America/Argentina/Buenos_Aires" (GMT-3), we know the offset is -03:00
+    // This is a simplified approach - in production you'd want to use a proper timezone library
+    const offsetString = "-03:00"; // GMT-3 for Argentina
+    
+    // Format as RFC3339 with timezone offset
+    const year = localDate.getFullYear();
+    const month = String(localDate.getMonth() + 1).padStart(2, '0');
+    const day = String(localDate.getDate()).padStart(2, '0');
+    const hours = String(localDate.getHours()).padStart(2, '0');
+    const minutes = String(localDate.getMinutes()).padStart(2, '0');
+    const seconds = String(localDate.getSeconds()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${offsetString}`;
+  };
+
   // Estados principales
   const [checkins, setCheckins] = useState<CheckinRecord[]>([]);
-  const [dailySummary, setDailySummary] = useState<DailySummary | null>(null);
+  const [liveStats, setLiveStats] = useState<LiveStats | null>(null);
   const [allUsers, setAllUsers] = useState<User[]>([]);
 
   // Estados de filtrado y paginación
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -157,7 +219,7 @@ export default function AttendancePage() {
     "all" | "late" | "ontime" | "overtime"
   >("all");
   const [locationFilter, setLocationFilter] = useState<
-    "all" | "office" | "home"
+    "all" | "remote_declared" | "remote_alternative" | "client" | "office"
   >("all");
 
   // Estados de modales
@@ -179,8 +241,9 @@ export default function AttendancePage() {
   // Estados de formularios
   const [createForm, setCreateForm] = useState<CreateCheckinData>({
     locations: [{ location_type: 1, location_detail: "" }],
+    late_reason: "",
     notes: "",
-    time: new Date().toISOString(),
+    time: "",
     user_id: 0,
   });
   const [editForm, setEditForm] = useState<EditCheckinData>({});
@@ -190,13 +253,13 @@ export default function AttendancePage() {
       setLoading(true);
       setError(null);
 
-      // Convertir fecha de YYYY-MM-DD a MM/dd/yyyy evitando problemas de timezone
-      const [year, month, day] = date.split("-");
-      const formattedDate = `${month}/${day}/${year}`;
-
-      // Obtener datos generales de check-ins
-      const checkinsData = await getCheckinsView(formattedDate);
-      setCheckins(checkinsData?.data || checkinsData || []);
+      // Obtener datos de check-ins usando la nueva API
+      const attendanceData = await getAttendanceSummary({
+        date: date,
+        page: 1,
+        page_size: 1000
+      });
+      setCheckins(attendanceData?.data || []);
 
       // Cargar usuarios para los formularios
       try {
@@ -206,111 +269,166 @@ export default function AttendancePage() {
         console.error("Error fetching users:", userError);
       }
 
-      // Intentar obtener el resumen diario del backend
-      let dailySummaryFromAPI: APIDailySummary | null = null;
+      // Obtener estadísticas en vivo del backend
+      let liveStatsFromAPI: LiveStats | null = null;
       try {
-        dailySummaryFromAPI = await getDashboardSummary();
-      } catch (summaryError) {
-        console.error("Error fetching daily summary:", summaryError);
+        console.log("🔍 Fetching live stats...");
+        const response = await getDashboardSummary();
+        console.log("Raw API Response:", response);
+        
+        // The API returns the data directly, not wrapped in a data property
+        if (response && typeof response === 'object') {
+          if ('absent_today' in response && 'total_employees' in response) {
+            liveStatsFromAPI = response as LiveStats;
+            console.log("✅ Valid live stats found:", liveStatsFromAPI);
+          } else if ('data' in response && response.data) {
+            liveStatsFromAPI = response.data as LiveStats;
+            console.log("✅ Live stats found in data property:", liveStatsFromAPI);
+          } else {
+            console.log("❌ Response doesn't match expected format:", response);
+            console.log("Response keys:", Object.keys(response));
+          }
+        } else {
+          console.log("❌ Response is not an object:", typeof response, response);
+        }
+        
+        console.log("Final processed live stats:", liveStatsFromAPI);
+      } catch (statsError) {
+        console.error("Error fetching live stats:", statsError);
       }
 
-      // Crear resumen diario usando datos del API o calculando manualmente
-      if (dailySummaryFromAPI) {
-        const uniqueUsers = checkinsData
-          ? new Set(
-              checkinsData.map((checkin: CheckinRecord) => checkin.user_id)
-            ).size
-          : 0;
-        setDailySummary({
-          date: dailySummaryFromAPI.date,
-          total_checkins: dailySummaryFromAPI.total_checkins,
-          on_time: dailySummaryFromAPI.total_on_time,
-          late: dailySummaryFromAPI.total_late,
-          absent: 0,
-          unique_users: uniqueUsers,
-          overtime: dailySummaryFromAPI.total_overtime,
-        });
-      } else if (checkinsData && checkinsData.length > 0) {
-        const onTime = checkinsData.filter(
-          (checkin: CheckinRecord) => !checkin.late
-        ).length;
-        const late = checkinsData.filter(
-          (checkin: CheckinRecord) => checkin.late
-        ).length;
-        const overtime = checkinsData.filter(
-          (checkin: CheckinRecord) => checkin.overtime
-        ).length;
-        const uniqueUsers = new Set(
-          checkinsData.map((checkin: CheckinRecord) => checkin.user_id)
-        ).size;
-
-        setDailySummary({
-          date,
-          total_checkins: checkinsData.length,
-          on_time: onTime,
-          late: late,
-          absent: 0,
-          unique_users: uniqueUsers,
-          overtime: overtime,
-        });
+      // Usar datos del API
+      if (liveStatsFromAPI) {
+        console.log("🎯 Setting live stats from API:", liveStatsFromAPI);
+        setLiveStats(liveStatsFromAPI);
       } else {
-        setDailySummary({
-          date,
-          total_checkins: 0,
-          on_time: 0,
-          late: 0,
-          absent: 0,
-          unique_users: 0,
-          overtime: 0,
+        console.log("⚠️ No live stats from API, setting defaults");
+        setLiveStats({
+          absent_today: 0,
+          attendance_rate: 0,
+          present_today: 0,
+          total_employees: 0,
         });
       }
     } catch (err) {
       console.error("Error fetching attendance data:", err);
       setError("Error al cargar los datos de asistencia");
-      setDailySummary({
-        date,
-        total_checkins: 0,
-        on_time: 0,
-        late: 0,
-        absent: 0,
-        unique_users: 0,
-        overtime: 0,
+      setLiveStats({
+        absent_today: 0,
+        attendance_rate: 0,
+        present_today: 0,
+        total_employees: 0,
       });
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // Set initial date after mount to avoid hydration issues
   useEffect(() => {
-    if (user) {
-      fetchAttendanceData(selectedDate);
-    }
-  }, [selectedDate, user, fetchAttendanceData]);
-
-  // Funciones de manejo de formularios
-  const handleEditCheckin = useCallback((checkin: CheckinRecord) => {
-    setEditingCheckin(checkin);
-    setEditForm({
-      notes: checkin.notes,
-      time: new Date(checkin.checkin_time).toISOString(),
-      locations: [
-        {
-          location_type: checkin.location_type === "office" ? 1 : 2,
-          location_detail: checkin.location_detail || "",
-        },
-      ],
-    });
-    setShowEditModal(true);
+    setMounted(true);
+    setSelectedDate(new Date().toISOString().split("T")[0]);
   }, []);
 
-  const handleCreateCheckin = async () => {
+  useEffect(() => {
+    if (user && selectedDate && mounted) {
+      fetchAttendanceData(selectedDate);
+    }
+  }, [selectedDate, user, fetchAttendanceData, mounted]);
+
+  // Funciones de manejo de formularios
+  const handleEditCheckin = useCallback(async (checkin: CheckinRecord) => {
+    setEditingCheckin(checkin);
+    
     try {
-      await createCheckinForUser(createForm);
+      // Fetch the specific user's information to get their timezone
+      const userData = await getUserById(checkin.user_id);
+      const userTimezone = userData.timezone || "America/Argentina/Buenos_Aires";
+      
+      // Convert UTC time to the specific user's timezone for the datetime picker
+      const utcDate = new Date(checkin.checkin_time);
+      
+      // Create a date object in the user's timezone
+      const userDate = new Date(utcDate.toLocaleString("en-US", { timeZone: userTimezone }));
+      
+      // Format as YYYY-MM-DDTHH:mm for datetime-local input
+      const year = userDate.getFullYear();
+      const month = String(userDate.getMonth() + 1).padStart(2, '0');
+      const day = String(userDate.getDate()).padStart(2, '0');
+      const hours = String(userDate.getHours()).padStart(2, '0');
+      const minutes = String(userDate.getMinutes()).padStart(2, '0');
+      const localDateTimeString = `${year}-${month}-${day}T${hours}:${minutes}`;
+      
+      
+      // Get location data from the locations array
+      const location = checkin.locations && checkin.locations.length > 0 ? checkin.locations[0] : null;
+      
+      setEditForm({
+        notes: checkin.notes,
+        late_reason: checkin.late_reason,
+        time: localDateTimeString,
+        userTimezone: userTimezone,
+        locations: [
+          {
+            location_type: location?.location_type || 1,
+            location_detail: location?.location_detail || "",
+          },
+        ],
+      });
+      setShowEditModal(true);
+    } catch (error) {
+      console.error("Error fetching user information:", error);
+      // Fallback to admin timezone if user fetch fails
+      const userTimezone = (user as { timezone?: string })?.timezone || "America/Argentina/Buenos_Aires";
+      
+      const utcDate = new Date(checkin.checkin_time);
+      const localDate = new Date(utcDate.toLocaleString("en-US", { timeZone: userTimezone }));
+      
+      const year = localDate.getFullYear();
+      const month = String(localDate.getMonth() + 1).padStart(2, '0');
+      const day = String(localDate.getDate()).padStart(2, '0');
+      const hours = String(localDate.getHours()).padStart(2, '0');
+      const minutes = String(localDate.getMinutes()).padStart(2, '0');
+      const localDateTimeString = `${year}-${month}-${day}T${hours}:${minutes}`;
+      
+      const location = checkin.locations && checkin.locations.length > 0 ? checkin.locations[0] : null;
+      
+      setEditForm({
+        notes: checkin.notes,
+        late_reason: checkin.late_reason,
+        time: localDateTimeString,
+        userTimezone: userTimezone,
+        locations: [
+          {
+            location_type: location?.location_type || 1,
+            location_detail: location?.location_detail || "",
+          },
+        ],
+      });
+      setShowEditModal(true);
+    }
+  }, [user]);
+
+  const handleCreateCheckin = async () => {
+    // Validate late_reason for late check-ins
+    if (isTimeLate(createForm.time) && (!createForm.late_reason || createForm.late_reason.trim() === "")) {
+      setError("El motivo de tardanza es obligatorio para check-ins tardíos (después de las 8:00 AM)");
+      return;
+    }
+
+    try {
+      const formattedCreateForm = {
+        ...createForm,
+        time: formatTimeForBackend(createForm.time),
+      };
+
+      await createCheckinForUser(formattedCreateForm);
       setShowCreateModal(false);
       setCreateForm({
         locations: [{ location_type: 1, location_detail: "" }],
+        late_reason: "",
         notes: "",
-        time: new Date().toISOString(),
+        time: "",
         user_id: 0,
       });
       fetchAttendanceData(selectedDate);
@@ -323,9 +441,26 @@ export default function AttendancePage() {
 
   const handleUpdateCheckin = async () => {
     if (!editingCheckin) return;
+    
+    if (!editingCheckin.checkin_id) {
+      console.error("Checkin ID is null or undefined:", editingCheckin);
+      setError("Error: ID de check-in no válido");
+      return;
+    }
 
-    try {
-      await updateCheckin(editingCheckin.checkin_id, editForm);
+    // Validate late_reason for late check-ins
+    if (editingCheckin.late && (!editForm.late_reason || editForm.late_reason.trim() === "")) {
+      setError("El motivo de tardanza es obligatorio para check-ins tardíos");
+      return;
+    }
+
+    try {      
+      const formattedEditForm = {
+        ...editForm,
+        time: editForm.time ? formatTimeForBackend(editForm.time) : undefined,
+      };
+
+      await updateCheckin(editingCheckin.checkin_id, formattedEditForm);
       setShowEditModal(false);
       setEditingCheckin(null);
       setEditForm({});
@@ -371,7 +506,7 @@ export default function AttendancePage() {
 
   const columns = useMemo(
     () => [
-      columnHelper.accessor("user_name", {
+      columnHelper.accessor("name", {
         header: "Usuario",
         cell: (info) => (
           <div className="flex items-center gap-3">
@@ -383,7 +518,7 @@ export default function AttendancePage() {
             <div>
               <div className="font-medium">{info.getValue()}</div>
               <div className="text-sm text-muted-foreground">
-                {info.row.original.user_email}
+                {info.row.original.email}
               </div>
             </div>
           </div>
@@ -394,10 +529,7 @@ export default function AttendancePage() {
         header: "Entrada",
         cell: (info) => (
           <div className="font-mono text-sm">
-            {new Date(info.getValue()).toLocaleTimeString("es-ES", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
+            {formatTimeInUserTimezone(info.getValue())}
           </div>
         ),
       }),
@@ -405,12 +537,7 @@ export default function AttendancePage() {
         header: "Salida",
         cell: (info) => (
           <div className="font-mono text-sm">
-            {info.getValue()
-              ? new Date(info.getValue()!).toLocaleTimeString("es-ES", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
-              : "-"}
+            {formatTimeInUserTimezone(info.getValue())}
           </div>
         ),
       }),
@@ -448,18 +575,105 @@ export default function AttendancePage() {
           }
         },
       }),
-      columnHelper.accessor("location_type", {
+      columnHelper.display({
+        id: "location",
         header: "Ubicación",
-        cell: (info) => (
-          <div className="flex items-center gap-2">
-            <span className="text-lg">
-              {info.getValue() === "office" ? "🏢" : "🏠"}
-            </span>
-            <span className="capitalize">
-              {info.getValue() === "office" ? "Oficina" : "Casa"}
-            </span>
-          </div>
-        ),
+        cell: (info) => {
+          const record = info.row.original;
+          const locations = record.locations;
+          const location = locations && locations.length > 0 ? locations[0] : null;
+          
+          if (!location) {
+            return (
+              <div className="flex items-center gap-2">
+                <span className="text-lg">❓</span>
+                <span className="text-muted-foreground">Desconocido</span>
+              </div>
+            );
+          }
+
+          const getLocationInfo = (type: number) => {
+            switch (type) {
+              case LOCATION_TYPES.REMOTE_DECLARED:
+                return { icon: "🏠", label: LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_DECLARED] };
+              case LOCATION_TYPES.REMOTE_ALTERNATIVE:
+                return { icon: "🏠", label: LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_ALTERNATIVE] };
+              case LOCATION_TYPES.CLIENT:
+                return { icon: "🏭", label: LOCATION_TYPE_LABELS[LOCATION_TYPES.CLIENT] };
+              case LOCATION_TYPES.OFFICE:
+                return { icon: "🏢", label: LOCATION_TYPE_LABELS[LOCATION_TYPES.OFFICE] };
+              default:
+                return { icon: "❓", label: "Desconocido" };
+            }
+          };
+
+          const locationInfo = getLocationInfo(location.location_type);
+          
+          return (
+            <div className="flex items-center gap-2">
+              <span className="text-lg">
+                {locationInfo.icon}
+              </span>
+              <div className="flex flex-col">
+                <span className="capitalize text-sm">
+                  {locationInfo.label}
+                </span>
+                {location.location_detail && (
+                  <span className="text-xs text-muted-foreground">
+                    {location.location_detail}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        },
+      }),
+      columnHelper.accessor("late_reason", {
+        header: "Motivo Tardanza",
+        cell: (info) => {
+          const lateReason = info.getValue();
+          const isLate = info.row.original.late;
+          
+          if (!isLate || !lateReason) {
+            return <span className="text-muted-foreground text-sm">-</span>;
+          }
+          
+          const displayText = lateReason.length > 30 ? `${lateReason.substring(0, 30)}...` : lateReason;
+          
+          return (
+            <div className="max-w-xs">
+              <span 
+                className="text-sm text-orange-700 bg-orange-50 px-2 py-1 rounded cursor-help"
+                title={lateReason.length > 30 ? lateReason : undefined}
+              >
+                {displayText}
+              </span>
+            </div>
+          );
+        },
+      }),
+      columnHelper.accessor("notes", {
+        header: "Notas",
+        cell: (info) => {
+          const notes = info.getValue();
+          
+          if (!notes) {
+            return <span className="text-muted-foreground text-sm">-</span>;
+          }
+          
+          const displayText = notes.length > 30 ? `${notes.substring(0, 30)}...` : notes;
+          
+          return (
+            <div className="max-w-xs">
+              <span 
+                className="text-sm text-gray-700 bg-gray-50 px-2 py-1 rounded cursor-help"
+                title={notes.length > 30 ? notes : undefined}
+              >
+                {displayText}
+              </span>
+            </div>
+          );
+        },
       }),
       columnHelper.display({
         id: "actions",
@@ -470,6 +684,8 @@ export default function AttendancePage() {
               size="sm"
               variant="outline"
               onClick={() => handleEditCheckin(info.row.original)}
+              disabled={info.row.original.checkin_id === null}
+              title={info.row.original.checkin_id === null ? "No se puede editar - Sin datos de check-in" : "Editar check-in"}
             >
               <Edit className="h-4 w-4" />
             </Button>
@@ -477,17 +693,18 @@ export default function AttendancePage() {
         ),
       }),
     ],
-    [columnHelper, handleEditCheckin]
+    [columnHelper, handleEditCheckin, user, formatTimeInUserTimezone]
   );
 
   const filteredData = useMemo(() => {
-    let filtered = checkins;
+    // First, filter out records with null checkin_id (no actual check-in data)
+    let filtered = checkins.filter((checkin) => checkin.checkin_id !== null);
 
     if (searchTerm) {
       filtered = filtered.filter(
         (checkin) =>
-          checkin.user_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          checkin.user_email.toLowerCase().includes(searchTerm.toLowerCase())
+          checkin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          checkin.email.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -502,9 +719,24 @@ export default function AttendancePage() {
     }
 
     if (locationFilter !== "all") {
-      filtered = filtered.filter(
-        (checkin) => checkin.location_type === locationFilter
-      );
+      filtered = filtered.filter((checkin) => {
+        // Get the first location from the locations array
+        const location = checkin.locations && checkin.locations.length > 0 ? checkin.locations[0] : null;
+        if (!location) return false;
+        
+        switch (locationFilter) {
+          case "remote_declared":
+            return location.location_type === LOCATION_TYPES.REMOTE_DECLARED;
+          case "remote_alternative":
+            return location.location_type === LOCATION_TYPES.REMOTE_ALTERNATIVE;
+          case "client":
+            return location.location_type === LOCATION_TYPES.CLIENT;
+          case "office":
+            return location.location_type === LOCATION_TYPES.OFFICE;
+          default:
+            return true;
+        }
+      });
     }
 
     return filtered;
@@ -594,15 +826,27 @@ export default function AttendancePage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Fecha y Hora</Label>
-                    <Input
-                      type="datetime-local"
-                      value={createForm.time}
-                      onChange={(e) =>
+                    <DateTimePicker
+                      date={createForm.time ? (() => {
+                        const date = new Date(createForm.time);
+                        return !isNaN(date.getTime()) ? date : undefined;
+                      })() : undefined}
+                      onDateChange={(date) =>
                         setCreateForm((prev) => ({
                           ...prev,
-                          time: e.target.value,
+                          time: date && !isNaN(date.getTime()) ? (() => {
+                            // Format the date in local timezone (not UTC)
+                            const year = date.getFullYear();
+                            const month = String(date.getMonth() + 1).padStart(2, '0');
+                            const day = String(date.getDate()).padStart(2, '0');
+                            const hours = String(date.getHours()).padStart(2, '0');
+                            const minutes = String(date.getMinutes()).padStart(2, '0');
+                            return `${year}-${month}-${day}T${hours}:${minutes}`;
+                          })() : "",
                         }))
                       }
+                      placeholder="Seleccionar fecha y hora"
+                      userTimezone={(user as { timezone?: string })?.timezone || "America/Argentina/Buenos_Aires"}
                     />
                   </div>
                   <div className="space-y-2">
@@ -625,8 +869,18 @@ export default function AttendancePage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="1">🏢 Oficina</SelectItem>
-                        <SelectItem value="2">🏠 Casa</SelectItem>
+                        <SelectItem value={LOCATION_TYPES.OFFICE.toString()}>
+                          🏢 {LOCATION_TYPE_LABELS[LOCATION_TYPES.OFFICE]}
+                        </SelectItem>
+                        <SelectItem value={LOCATION_TYPES.REMOTE_DECLARED.toString()}>
+                          🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_DECLARED]}
+                        </SelectItem>
+                        <SelectItem value={LOCATION_TYPES.REMOTE_ALTERNATIVE.toString()}>
+                          🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_ALTERNATIVE]}
+                        </SelectItem>
+                        <SelectItem value={LOCATION_TYPES.CLIENT.toString()}>
+                          🏢 {LOCATION_TYPE_LABELS[LOCATION_TYPES.CLIENT]}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -648,6 +902,27 @@ export default function AttendancePage() {
                       }
                     />
                   </div>
+                  {isTimeLate(createForm.time) && (
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2">
+                        Motivo de Tardanza <span className="text-red-500">*</span>
+                      </Label>
+                      <Textarea
+                        placeholder="Explicar el motivo de la tardanza..."
+                        value={createForm.late_reason}
+                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                          setCreateForm((prev) => ({
+                            ...prev,
+                            late_reason: e.target.value,
+                          }))
+                        }
+                        className="border-orange-200 focus:border-orange-500"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Campo obligatorio para check-ins tardíos
+                      </p>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label>Notas</Label>
                     <Textarea
@@ -710,10 +985,10 @@ export default function AttendancePage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {loading ? "..." : dailySummary?.total_checkins || 0}
+              {loading ? "..." : liveStats?.total_employees || 0}
             </div>
             <p className="text-xs text-muted-foreground">
-              de {dailySummary?.unique_users || 0} empleados
+              de {liveStats?.total_employees || 0} empleados
             </p>
           </CardContent>
         </Card>
@@ -725,14 +1000,11 @@ export default function AttendancePage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {loading ? "..." : dailySummary?.on_time || 0}
+              {loading ? "..." : liveStats?.present_today || 0}
             </div>
             <p className="text-xs text-muted-foreground">
-              {dailySummary && dailySummary.total_checkins > 0
-                ? (
-                    (dailySummary.on_time / dailySummary.total_checkins) *
-                    100
-                  ).toFixed(1)
+              {liveStats && liveStats.total_employees > 0
+                ? Math.round((liveStats.present_today / liveStats.total_employees) * 100)
                 : 0}
               % puntualidad
             </p>
@@ -746,14 +1018,11 @@ export default function AttendancePage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-yellow-600">
-              {loading ? "..." : dailySummary?.late || 0}
+              {loading ? "..." : liveStats?.absent_today || 0}
             </div>
             <p className="text-xs text-muted-foreground">
-              {dailySummary && dailySummary.total_checkins > 0
-                ? (
-                    (dailySummary.late / dailySummary.total_checkins) *
-                    100
-                  ).toFixed(1)
+              {liveStats && liveStats.total_employees > 0
+                ? Math.round((liveStats.absent_today / liveStats.total_employees) * 100)
                 : 0}
               % tardanzas
             </p>
@@ -767,7 +1036,7 @@ export default function AttendancePage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              {loading ? "..." : dailySummary?.overtime || 0}
+              0
             </div>
             <p className="text-xs text-muted-foreground">
               registros con sobretiem
@@ -782,11 +1051,8 @@ export default function AttendancePage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-600">
-              {dailySummary && dailySummary.total_checkins > 0
-                ? (
-                    (dailySummary.on_time / dailySummary.total_checkins) *
-                    100
-                  ).toFixed(0)
+              {liveStats && liveStats.total_employees > 0
+                ? Math.round((liveStats.present_today / liveStats.total_employees) * 100)
                 : 0}
               %
             </div>
@@ -831,7 +1097,7 @@ export default function AttendancePage() {
             </Select>
             <Select
               value={locationFilter}
-              onValueChange={(value: "all" | "office" | "home") =>
+              onValueChange={(value: "all" | "remote_declared" | "remote_alternative" | "client" | "office") =>
                 setLocationFilter(value)
               }
             >
@@ -840,8 +1106,10 @@ export default function AttendancePage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas las Ubicaciones</SelectItem>
-                <SelectItem value="office">🏢 Oficina</SelectItem>
-                <SelectItem value="home">🏠 Casa</SelectItem>
+                <SelectItem value="remote_declared">🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_DECLARED]}</SelectItem>
+                <SelectItem value="remote_alternative">🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_ALTERNATIVE]}</SelectItem>
+                <SelectItem value="client">🏭 {LOCATION_TYPE_LABELS[LOCATION_TYPES.CLIENT]}</SelectItem>
+                <SelectItem value="office">🏢 {LOCATION_TYPE_LABELS[LOCATION_TYPES.OFFICE]}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1058,18 +1326,33 @@ export default function AttendancePage() {
           <DialogHeader>
             <DialogTitle>Editar Check-in</DialogTitle>
             <DialogDescription>
-              Modificar registro de asistencia de {editingCheckin?.user_name}
+              Modificar registro de asistencia de {editingCheckin?.name}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Fecha y Hora</Label>
-              <Input
-                type="datetime-local"
-                value={editForm.time || ""}
-                onChange={(e) =>
-                  setEditForm((prev) => ({ ...prev, time: e.target.value }))
+              <DateTimePicker
+                date={editForm.time ? (() => {
+                  const date = new Date(editForm.time);
+                  return !isNaN(date.getTime()) ? date : undefined;
+                })() : undefined}
+                onDateChange={(date) =>
+                  setEditForm((prev) => ({
+                    ...prev,
+                    time: date && !isNaN(date.getTime()) ? (() => {
+                      // Format the date in local timezone (not UTC)
+                      const year = date.getFullYear();
+                      const month = String(date.getMonth() + 1).padStart(2, '0');
+                      const day = String(date.getDate()).padStart(2, '0');
+                      const hours = String(date.getHours()).padStart(2, '0');
+                      const minutes = String(date.getMinutes()).padStart(2, '0');
+                      return `${year}-${month}-${day}T${hours}:${minutes}`;
+                    })() : "",
+                  }))
                 }
+                placeholder="Seleccionar fecha y hora"
+                userTimezone={editForm.userTimezone || (user as { timezone?: string })?.timezone || "America/Argentina/Buenos_Aires"}
               />
             </div>
             <div className="space-y-2">
@@ -1095,8 +1378,18 @@ export default function AttendancePage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">🏢 Oficina</SelectItem>
-                  <SelectItem value="2">🏠 Casa</SelectItem>
+                  <SelectItem value={LOCATION_TYPES.OFFICE.toString()}>
+                    🏢 {LOCATION_TYPE_LABELS[LOCATION_TYPES.OFFICE]}
+                  </SelectItem>
+                  <SelectItem value={LOCATION_TYPES.REMOTE_DECLARED.toString()}>
+                    🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_DECLARED]}
+                  </SelectItem>
+                  <SelectItem value={LOCATION_TYPES.REMOTE_ALTERNATIVE.toString()}>
+                    🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_ALTERNATIVE]}
+                  </SelectItem>
+                  <SelectItem value={LOCATION_TYPES.CLIENT.toString()}>
+                    🏢 {LOCATION_TYPE_LABELS[LOCATION_TYPES.CLIENT]}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1118,6 +1411,24 @@ export default function AttendancePage() {
                 }
               />
             </div>
+            {editingCheckin?.late && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  Motivo de Tardanza <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  placeholder="Explicar el motivo de la tardanza..."
+                  value={editForm.late_reason || ""}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                    setEditForm((prev) => ({ ...prev, late_reason: e.target.value }))
+                  }
+                  className="border-orange-200 focus:border-orange-500"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Campo obligatorio para check-ins tardíos
+                </p>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Notas</Label>
               <Textarea

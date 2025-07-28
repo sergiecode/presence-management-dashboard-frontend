@@ -40,11 +40,7 @@ export async function authenticatedFetch(
 
 // Dashboard Summary APIs
 export async function getDashboardSummary() {
-  const today = new Date().toISOString().split("T")[0]; // Formato YYYY-MM-DD
-  const params = new URLSearchParams({ date: today });
-  return authenticatedFetch(
-    `/api/dashboard/attendance/daily-summary?${params.toString()}`
-  );
+  return authenticatedFetch(`/api/dashboard/attendance/live-stats`);
 }
 
 export async function getUsersStats() {
@@ -119,6 +115,25 @@ export async function getAttendanceStats(filters?: {
   const queryString = params.toString();
   return authenticatedFetch(
     `/api/dashboard/attendance-stats${queryString ? `?${queryString}` : ""}`
+  );
+}
+
+export async function getAttendanceSummary(filters?: {
+  date?: string;
+  page?: number;
+  page_size?: number;
+}) {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined) {
+        params.append(key, value.toString());
+      }
+    });
+  }
+  const queryString = params.toString();
+  return authenticatedFetch(
+    `/api/dashboard/attendance/summary${queryString ? `?${queryString}` : ""}`
   );
 }
 
