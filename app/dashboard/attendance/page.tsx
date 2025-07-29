@@ -28,11 +28,13 @@ import {
 import {
   getAttendanceSummary,
   getDashboardSummary,
-  exportCheckinsReport,
+  exportAttendanceReport,
   updateCheckin,
   createCheckinForUser,
   getUsers,
   getUserById,
+  downloadFile,
+  generateExportFilename,
 } from "@/app/services/dashboard";
 import { useUser } from "@/app/contexts/UserContext";
 import { LOCATION_TYPE_LABELS, LOCATION_TYPES } from "@/app/constants/enums";
@@ -106,6 +108,16 @@ interface User {
   email: string;
   role: string;
   active: boolean;
+  location?: {
+    calle?: string;
+    ciudad?: string;
+    codigo_postal?: string;
+    numero?: string;
+    pais?: string;
+    piso?: string;
+    provincia?: string;
+    tipo?: number;
+  };
 }
 
 interface CreateCheckinData {
@@ -144,7 +156,7 @@ export default function AttendancePage() {
   const { user } = useUser();
 
   // Utility function to format time in user's timezone
-  const formatTimeInUserTimezone = (timeString: string | null, fallback = "-") => {
+  const formatTimeInUserTimezone = useCallback((timeString: string | null, fallback = "-") => {
     if (!timeString) return fallback;
     
     try {
@@ -162,7 +174,7 @@ export default function AttendancePage() {
       console.error("Error formatting time:", error, "Time string:", timeString);
       return fallback;
     }
-  };
+  }, [user]);
 
   // Helper function to check if a time is late (after 8:00 AM)
   const isTimeLate = (timeStr: string): boolean => {
@@ -214,6 +226,7 @@ export default function AttendancePage() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [exportingType, setExportingType] = useState<'attendance' | 'checkins' | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<
     "all" | "late" | "ontime" | "overtime"
@@ -234,9 +247,6 @@ export default function AttendancePage() {
   const [exportStartDate, setExportStartDate] = useState(
     new Date().toISOString().split("T")[0]
   );
-  const [exportEndDate, setExportEndDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
 
   // Estados de formularios
   const [createForm, setCreateForm] = useState<CreateCheckinData>({
@@ -246,6 +256,52 @@ export default function AttendancePage() {
     time: "",
     user_id: 0,
   });
+
+  // Function to auto-populate location details based on user and location type
+  const autoPopulateLocationDetails = (userId: number, locationType: number) => {
+    const selectedUser = allUsers.find(user => user.id === userId);
+    
+    if (!selectedUser) return "";
+
+    if (locationType === LOCATION_TYPES.OFFICE) {
+      // ABSTI office address
+      return "Junin 1120 - 4 B - Recoleta - Ciudad de Buenos Aires - Argentina";
+    } else if (locationType === LOCATION_TYPES.REMOTE_DECLARED && selectedUser.location) {
+      // User's declared remote address
+      const loc = selectedUser.location;
+      const parts = [];
+      
+      if (loc.calle && loc.numero) {
+        parts.push(`${loc.calle} ${loc.numero}`);
+      } else if (loc.calle) {
+        parts.push(loc.calle);
+      }
+      
+      if (loc.piso) {
+        parts.push(`Piso ${loc.piso}`);
+      }
+      
+      if (loc.ciudad) {
+        parts.push(loc.ciudad);
+      }
+      
+      if (loc.provincia) {
+        parts.push(loc.provincia);
+      }
+      
+      if (loc.pais) {
+        parts.push(loc.pais);
+      }
+      
+      if (loc.codigo_postal) {
+        parts.push(`CP: ${loc.codigo_postal}`);
+      }
+      
+      return parts.filter(Boolean).join(" - ");
+    }
+    
+    return "";
+  };
   const [editForm, setEditForm] = useState<EditCheckinData>({});
 
   const fetchAttendanceData = useCallback(async (date: string) => {
@@ -475,29 +531,28 @@ export default function AttendancePage() {
   const handleExport = async () => {
     try {
       setExporting(true);
-      const blob = await exportCheckinsReport({
-        startDate: exportStartDate,
-        endDate: exportEndDate,
-        userId: undefined, // Se puede modificar para exportar un usuario específico
+      setExportingType('attendance');
+      
+      // Use the currently selected date from the table, or fallback to export start date
+      const dateToUse = selectedDate || exportStartDate;
+      
+      const blob = await exportAttendanceReport({
+        date: dateToUse,
       });
+      const filename = generateExportFilename('attendance', dateToUse);
 
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `checkins_${exportStartDate}_to_${exportEndDate}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      downloadFile(blob, filename, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      
       setShowExportModal(false);
       setSuccessMessage(
-        `Datos exportados exitosamente (${exportStartDate} - ${exportEndDate})`
+        `ART Asistencia exportado exitosamente (${dateToUse})`
       );
     } catch (err) {
       console.error("Error exporting data:", err);
       setError("Error al exportar los datos");
     } finally {
       setExporting(false);
+      setExportingType(null);
     }
   };
 
@@ -693,7 +748,7 @@ export default function AttendancePage() {
         ),
       }),
     ],
-    [columnHelper, handleEditCheckin, user, formatTimeInUserTimezone]
+    [columnHelper, handleEditCheckin, formatTimeInUserTimezone]
   );
 
   const filteredData = useMemo(() => {
@@ -786,7 +841,19 @@ export default function AttendancePage() {
             className="w-40"
           />
           <div className="flex gap-2">
-            <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+            <Dialog open={showCreateModal} onOpenChange={(open) => {
+              setShowCreateModal(open);
+              if (!open) {
+                // Reset form when modal is closed
+                setCreateForm({
+                  locations: [{ location_type: 1, location_detail: "" }],
+                  late_reason: "",
+                  notes: "",
+                  time: "",
+                  user_id: 0,
+                });
+              }
+            }}>
               <DialogTrigger asChild>
                 <Button>
                   <Plus className="h-4 w-4 mr-2" />
@@ -805,12 +872,22 @@ export default function AttendancePage() {
                     <Label>Usuario</Label>
                     <Select
                       value={createForm.user_id.toString()}
-                      onValueChange={(value) =>
+                      onValueChange={(value) => {
+                        const userId = parseInt(value);
+                        const currentLocationType = createForm.locations[0].location_type;
+                        const autoLocationDetail = autoPopulateLocationDetails(userId, currentLocationType);
+                        
                         setCreateForm((prev) => ({
                           ...prev,
-                          user_id: parseInt(value),
-                        }))
-                      }
+                          user_id: userId,
+                          locations: [
+                            {
+                              ...prev.locations[0],
+                              location_detail: autoLocationDetail,
+                            },
+                          ],
+                        }));
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Seleccionar usuario" />
@@ -853,17 +930,21 @@ export default function AttendancePage() {
                     <Label>Tipo de Ubicación</Label>
                     <Select
                       value={createForm.locations[0].location_type.toString()}
-                      onValueChange={(value) =>
+                      onValueChange={(value) => {
+                        const locationType = parseInt(value);
+                        const autoLocationDetail = autoPopulateLocationDetails(createForm.user_id, locationType);
+                        
                         setCreateForm((prev) => ({
                           ...prev,
                           locations: [
                             {
                               ...prev.locations[0],
-                              location_type: parseInt(value),
+                              location_type: locationType,
+                              location_detail: autoLocationDetail,
                             },
                           ],
-                        }))
-                      }
+                        }));
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -900,7 +981,20 @@ export default function AttendancePage() {
                           ],
                         }))
                       }
+                      className={createForm.locations[0].location_detail && 
+                        (createForm.locations[0].location_type === LOCATION_TYPES.OFFICE || 
+                         createForm.locations[0].location_type === LOCATION_TYPES.REMOTE_DECLARED) 
+                        ? "bg-gray-50" : ""}
                     />
+                    {(createForm.locations[0].location_type === LOCATION_TYPES.OFFICE || 
+                      createForm.locations[0].location_type === LOCATION_TYPES.REMOTE_DECLARED) && 
+                      createForm.locations[0].location_detail && (
+                      <p className="text-xs text-muted-foreground">
+                        {createForm.locations[0].location_type === LOCATION_TYPES.OFFICE 
+                          ? "Dirección de oficina ABSTI auto-completada" 
+                          : "Dirección del usuario auto-completada"}
+                      </p>
+                    )}
                   </div>
                   {isTimeLate(createForm.time) && (
                     <div className="space-y-2">
@@ -962,7 +1056,12 @@ export default function AttendancePage() {
             </Button>
             <Button
               variant="outline"
-              onClick={() => setShowExportModal(true)}
+              onClick={() => {
+                // Set export date to the currently selected date
+                const currentDate = selectedDate || new Date().toISOString().split("T")[0];
+                setExportStartDate(currentDate);
+                setShowExportModal(true);
+              }}
               disabled={exporting}
             >
               <Download
@@ -1274,8 +1373,7 @@ export default function AttendancePage() {
           <DialogHeader>
             <DialogTitle>Exportar Registros</DialogTitle>
             <DialogDescription>
-              Selecciona el rango de fechas para exportar los registros de
-              check-ins
+              Selecciona la fecha para exportar el registro de asistencia. El archivo se descargará en formato Excel (.xlsx).
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -1287,14 +1385,7 @@ export default function AttendancePage() {
                 onChange={(e) => setExportStartDate(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
-              <Label>Fecha de Fin</Label>
-              <Input
-                type="date"
-                value={exportEndDate}
-                onChange={(e) => setExportEndDate(e.target.value)}
-              />
-            </div>
+
             <div className="flex justify-end gap-2">
               <Button
                 variant="outline"
@@ -1302,8 +1393,11 @@ export default function AttendancePage() {
               >
                 Cancelar
               </Button>
-              <Button onClick={handleExport} disabled={exporting}>
-                {exporting ? (
+              <Button 
+                onClick={handleExport} 
+                disabled={exporting}
+              >
+                {exporting && exportingType === 'attendance' ? (
                   <>
                     <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                     Exportando...
@@ -1311,7 +1405,7 @@ export default function AttendancePage() {
                 ) : (
                   <>
                     <Download className="h-4 w-4 mr-2" />
-                    Exportar CSV
+                    Exportar ART Asistencia
                   </>
                 )}
               </Button>
@@ -1361,18 +1455,21 @@ export default function AttendancePage() {
                 value={
                   editForm.locations?.[0]?.location_type?.toString() || "1"
                 }
-                onValueChange={(value) =>
+                onValueChange={(value) => {
+                  const locationType = parseInt(value);
+                  const userId = editingCheckin?.user_id || 0;
+                  const autoLocationDetail = autoPopulateLocationDetails(userId, locationType);
+                  
                   setEditForm((prev) => ({
                     ...prev,
                     locations: [
                       {
-                        location_type: parseInt(value),
-                        location_detail:
-                          prev.locations?.[0]?.location_detail || "",
+                        location_type: locationType,
+                        location_detail: autoLocationDetail || prev.locations?.[0]?.location_detail || "",
                       },
                     ],
-                  }))
-                }
+                  }));
+                }}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -1409,7 +1506,20 @@ export default function AttendancePage() {
                     ],
                   }))
                 }
+                className={editForm.locations?.[0]?.location_detail && 
+                  (editForm.locations?.[0]?.location_type === LOCATION_TYPES.OFFICE || 
+                   editForm.locations?.[0]?.location_type === LOCATION_TYPES.REMOTE_DECLARED) 
+                  ? "bg-gray-50" : ""}
               />
+              {(editForm.locations?.[0]?.location_type === LOCATION_TYPES.OFFICE || 
+                editForm.locations?.[0]?.location_type === LOCATION_TYPES.REMOTE_DECLARED) && 
+                editForm.locations?.[0]?.location_detail && (
+                <p className="text-xs text-muted-foreground">
+                  {editForm.locations?.[0]?.location_type === LOCATION_TYPES.OFFICE 
+                    ? "Dirección de oficina ABSTI auto-completada" 
+                    : "Dirección del usuario auto-completada"}
+                </p>
+              )}
             </div>
             {editingCheckin?.late && (
               <div className="space-y-2">

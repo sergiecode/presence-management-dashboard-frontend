@@ -374,8 +374,7 @@ export async function removeTeamMember(teamId: number, userId: number) {
 
 // Export APIs
 export async function exportAttendanceReport(filters?: {
-  start_date?: string;
-  end_date?: string;
+  date?: string;
   user_id?: number;
   team_id?: number;
   format?: "csv" | "excel";
@@ -410,18 +409,25 @@ export async function exportAttendanceReport(filters?: {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
 
-  return response.blob();
+  const blob = await response.blob();
+
+  // Ensure proper MIME type for Excel files
+  if (blob.type === "" || blob.type === "application/octet-stream") {
+    return new Blob([blob], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+  }
+
+  return blob;
 }
 
 export async function exportCheckinsReport(filters?: {
-  startDate?: string;
-  endDate?: string;
+  date?: string;
   userId?: number;
 }) {
   const params = new URLSearchParams();
   if (filters) {
-    if (filters.startDate) params.append("startDate", filters.startDate);
-    if (filters.endDate) params.append("endDate", filters.endDate);
+    if (filters.date) params.append("date", filters.date);
     if (filters.userId) params.append("userId", filters.userId.toString());
   }
   const queryString = params.toString();
@@ -446,7 +452,16 @@ export async function exportCheckinsReport(filters?: {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
 
-  return response.blob();
+  const blob = await response.blob();
+
+  // Ensure proper MIME type for Excel files
+  if (blob.type === "" || blob.type === "application/octet-stream") {
+    return new Blob([blob], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+  }
+
+  return blob;
 }
 
 export async function exportAbsenceReport(filters?: {
@@ -485,7 +500,16 @@ export async function exportAbsenceReport(filters?: {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
 
-  return response.blob();
+  const blob = await response.blob();
+
+  // Ensure proper MIME type for Excel files
+  if (blob.type === "" || blob.type === "application/octet-stream") {
+    return new Blob([blob], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+  }
+
+  return blob;
 }
 
 // Audit Logs API
@@ -644,4 +668,34 @@ export async function updateUserCheckinConfig(
     method: "PUT",
     body: JSON.stringify(configData),
   });
+}
+
+// Utility function to download files with proper handling
+export function downloadFile(blob: Blob, filename: string, mimeType?: string) {
+  // Create blob with proper MIME type if provided
+  const fileBlob = mimeType ? new Blob([blob], { type: mimeType }) : blob;
+
+  const url = window.URL.createObjectURL(fileBlob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}
+
+// Generate filename with date
+export function generateExportFilename(
+  type: "attendance" | "checkins",
+  date?: string
+): string {
+  const dateSuffix = date ? `_${date}` : "";
+  const timestamp = new Date().toISOString().split("T")[0];
+
+  if (type === "attendance") {
+    return `ART_presentismo${dateSuffix || `_${timestamp}`}.xlsx`;
+  } else {
+    return `ART_checkins${dateSuffix || `_${timestamp}`}.xlsx`;
+  }
 }
