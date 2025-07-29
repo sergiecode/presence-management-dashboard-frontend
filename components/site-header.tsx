@@ -18,7 +18,7 @@ const navMain = [
 
 export function SiteHeader() {
   const pathname = usePathname();
-  const [title, setTitle] = useState("Portal RRHH");
+  const [title, setTitle] = useState("ABS-TI Portal");
 
   useEffect(() => {
     if (!pathname) return;
@@ -26,11 +26,11 @@ export function SiteHeader() {
     const sortedNav = [...navMain].sort((a, b) => b.url.length - a.url.length);
     const currentItem = sortedNav.find((item) => pathname.startsWith(item.url));
 
-    setTitle(currentItem ? currentItem.title : "Portal RRHH");
+    setTitle(currentItem ? currentItem.title : "ABS-TI Portal");
   }, [pathname]);
 
   return (
-    <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height) py-2">
+    <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b-2 border-b-orange-500 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height) py-2">
       <div className="data-[state=open]:bg-sidebar-accent flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
         <SidebarTrigger className="-ml-1" />
         <Separator

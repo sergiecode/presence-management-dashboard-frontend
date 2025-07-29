@@ -2,7 +2,6 @@
 
 import { useAuth } from "@/hooks/useAuth";
 import { AppSidebar } from "@/components/app-sidebar";
-import { SectionCards } from "@/components/section-cards";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { useRouter } from "next/navigation";
@@ -24,7 +23,7 @@ export default function AuthWrapper({
   return (
     <SidebarProvider>
       <AppSidebar variant="inset" />
-      <SidebarInset className="dark:bg-sidebar bg-white ">
+      <SidebarInset className="dark:bg-sidebar bg-white">
         <SiteHeader />
         <div className="flex flex-1 flex-col ">
           <div className="@container/main flex flex-1 flex-col gap-2">

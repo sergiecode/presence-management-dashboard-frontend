@@ -122,7 +122,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   width={32}
                   height={32}
                 />
-                <span className="text-base font-semibold">Portal RRHH</span>
+                <span className="text-base font-semibold">ABS-TI Portal</span>
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>

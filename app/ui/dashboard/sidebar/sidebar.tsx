@@ -63,7 +63,7 @@ export default function Sidebar() {
       <div className={styles.containerLogo}>
         <img src="/logo2.png" className={styles.imgLogo} alt="Logo" />
         <div className={styles.titles}>
-          <h2>Portal RRH</h2>
+          <h2>ABS-TI Portal</h2>
           <span>Sistema de gestion</span>
         </div>
       </div>

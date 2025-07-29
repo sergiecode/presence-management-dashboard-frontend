@@ -19,7 +19,7 @@
 .titles {
   display: flex;
   flex-direction: column;
-  gap: .2rem;
+  gap: 0.2rem;
   font-size: 16px;
 }
 
@@ -30,7 +30,7 @@
 }
 
 .titles span {
-  font-size: .875rem;
+  font-size: 0.875rem;
   line-height: 1.25rem;
 }
 

@@ -986,19 +986,19 @@ export default function EmployeesPage() {
 
   return (
     <TooltipProvider>
-      <div className="flex flex-col gap-6 h-full p-6">
+      <div className="flex flex-col gap-4 h-full p-6 min-h-0">
         {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">
+            <h1 className="text-2xl font-bold tracking-tight">
               Gestión de Empleados
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Administra usuarios, permisos y configuraciones del sistema
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={fetchUsers} disabled={loading}>
+            <Button size="sm" variant="outline" onClick={fetchUsers} disabled={loading}>
               <RefreshCw
                 className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
               />
@@ -1027,83 +1027,68 @@ export default function EmployeesPage() {
         )}
 
         {/* Estadísticas */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Total Usuarios
-              </CardTitle>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <Card className="p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Total Usuarios</p>
+                <p className="text-lg font-bold">{users.length}</p>
+              </div>
               <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{users.length}</div>
-            </CardContent>
+            </div>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Administradores
-              </CardTitle>
+          <Card className="p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Administradores</p>
+                <p className="text-lg font-bold text-red-600">
+                  {users.filter((u) => u.role === "admin").length}
+                </p>
+              </div>
               <Settings className="h-4 w-4 text-red-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">
-                {users.filter((u) => u.role === "admin").length}
-              </div>
-            </CardContent>
+            </div>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Recursos Humanos
-              </CardTitle>
+          <Card className="p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Recursos Humanos</p>
+                <p className="text-lg font-bold text-purple-600">
+                  {users.filter((u) => u.role === "hr").length}
+                </p>
+              </div>
               <Users className="h-4 w-4 text-purple-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-purple-600">
-                {users.filter((u) => u.role === "hr").length}
-              </div>
-            </CardContent>
+            </div>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Usuarios Activos
-              </CardTitle>
+          <Card className="p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Usuarios Activos</p>
+                <p className="text-lg font-bold text-green-600">
+                  {users.filter((u) => u.active).length}
+                </p>
+              </div>
               <CheckCircle className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {users.filter((u) => u.active).length}
-              </div>
-            </CardContent>
+            </div>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Pendientes Aprobación
-              </CardTitle>
-              <AlertTriangle className="h-4 w-4 text-orange-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">
-                {users.filter((u) => u.pending_approval).length}
+          <Card className="p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Pendientes Aprobación</p>
+                <p className="text-lg font-bold text-orange-600">
+                  {users.filter((u) => u.pending_approval).length}
+                </p>
               </div>
-            </CardContent>
+              <AlertTriangle className="h-4 w-4 text-orange-600" />
+            </div>
           </Card>
         </div>
 
         {/* Filtros */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Filtros de Búsqueda</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
                 <div className="relative">
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -1138,11 +1123,9 @@ export default function EmployeesPage() {
                 </SelectContent>
               </Select>
             </div>
-          </CardContent>
-        </Card>
 
         {/* Tabla de usuarios */}
-        <Card className="flex-1">
+        <Card className="flex-1 flex flex-col min-h-0">
           <CardHeader>
             <CardTitle>Lista de Empleados</CardTitle>
             <CardDescription>
@@ -1151,7 +1134,7 @@ export default function EmployeesPage() {
                 : `${filteredData.length} de ${users.length} usuarios`}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1 flex flex-col min-h-0">
             {loading ? (
               <div className="space-y-3">
                 {[...Array(10)].map((_, i) => (
@@ -1178,8 +1161,9 @@ export default function EmployeesPage() {
               </div>
             ) : (
               <>
-                <div className="rounded-md border">
-                  <Table>
+                <div className="flex-1 overflow-auto">
+                  <div className="rounded-md border">
+                    <Table>
                     <TableHeader>
                       {table.getHeaderGroups().map((headerGroup) => (
                         <TableRow key={headerGroup.id}>
@@ -1228,7 +1212,7 @@ export default function EmployeesPage() {
                 </div>
 
                 {/* Paginación */}
-                <div className="flex items-center justify-between space-x-2 py-4">
+                <div className="flex items-center justify-between space-x-2 py-4 mt-auto">
                   <div className="text-sm text-muted-foreground">
                     Mostrando{" "}
                     {table.getState().pagination.pageIndex *
@@ -1262,6 +1246,7 @@ export default function EmployeesPage() {
                       <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>
+                </div>
                 </div>
               </>
             )}

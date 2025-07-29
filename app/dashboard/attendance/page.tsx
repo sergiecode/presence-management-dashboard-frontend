@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -25,6 +25,13 @@ import {
   ChevronRight,
   X,
 } from "lucide-react";
+import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   getAttendanceSummary,
   getDashboardSummary,
@@ -108,6 +115,7 @@ interface User {
   email: string;
   role: string;
   active: boolean;
+  pending_approval: boolean;
   location?: {
     calle?: string;
     ciudad?: string;
@@ -243,6 +251,11 @@ export default function AttendancePage() {
     null
   );
 
+  // Estados para búsqueda de usuarios
+  const [userSearchTerm, setUserSearchTerm] = useState("");
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const userSearchRef = useRef<HTMLDivElement>(null);
+
   // Estados para exportación
   const [exportStartDate, setExportStartDate] = useState(
     new Date().toISOString().split("T")[0]
@@ -304,6 +317,65 @@ export default function AttendancePage() {
   };
   const [editForm, setEditForm] = useState<EditCheckinData>({});
 
+  // First, filter users who haven't checked in today and are approved
+  const eligibleUsers = useMemo(() => {
+    if (!selectedDate || !allUsers.length) return [];
+    
+    // Get user IDs who have already checked in today
+    const checkedInUserIds = new Set(
+      checkins
+        .filter(checkin => checkin.checkin_id !== null)
+        .map(checkin => checkin.user_id)
+    );
+    
+    // Filter users who:
+    // 1. Haven't checked in today
+    // 2. Are approved (not pending approval)
+    // 3. Are active
+    return allUsers.filter(user => {
+      const hasCheckedIn = checkedInUserIds.has(user.id);
+      const isApproved = !user.pending_approval;
+      const isActive = user.active;
+      
+      return !hasCheckedIn && isApproved && isActive;
+    });
+  }, [allUsers, checkins, selectedDate]);
+
+  // Then, filter the eligible users by search term
+  const availableUsers = useMemo(() => {
+    if (!userSearchTerm) return eligibleUsers;
+    
+    return eligibleUsers.filter(user => 
+      user.name.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(userSearchTerm.toLowerCase())
+    );
+  }, [eligibleUsers, userSearchTerm]);
+
+  // Show all eligible users when dropdown is open and no search term
+  const displayUsers = useMemo(() => {
+    if (showUserDropdown && !userSearchTerm) {
+      return eligibleUsers;
+    }
+    return availableUsers;
+  }, [showUserDropdown, userSearchTerm, eligibleUsers, availableUsers]);
+
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userSearchRef.current && !userSearchRef.current.contains(event.target as Node)) {
+        setShowUserDropdown(false);
+      }
+    };
+
+    if (showUserDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showUserDropdown]);
+
   const fetchAttendanceData = useCallback(async (date: string) => {
     try {
       setLoading(true);
@@ -328,18 +400,14 @@ export default function AttendancePage() {
       // Obtener estadísticas en vivo del backend
       let liveStatsFromAPI: LiveStats | null = null;
       try {
-        console.log("🔍 Fetching live stats...");
         const response = await getDashboardSummary();
-        console.log("Raw API Response:", response);
         
         // The API returns the data directly, not wrapped in a data property
         if (response && typeof response === 'object') {
           if ('absent_today' in response && 'total_employees' in response) {
             liveStatsFromAPI = response as LiveStats;
-            console.log("✅ Valid live stats found:", liveStatsFromAPI);
           } else if ('data' in response && response.data) {
             liveStatsFromAPI = response.data as LiveStats;
-            console.log("✅ Live stats found in data property:", liveStatsFromAPI);
           } else {
             console.log("❌ Response doesn't match expected format:", response);
             console.log("Response keys:", Object.keys(response));
@@ -348,14 +416,12 @@ export default function AttendancePage() {
           console.log("❌ Response is not an object:", typeof response, response);
         }
         
-        console.log("Final processed live stats:", liveStatsFromAPI);
       } catch (statsError) {
         console.error("Error fetching live stats:", statsError);
       }
 
       // Usar datos del API
       if (liveStatsFromAPI) {
-        console.log("🎯 Setting live stats from API:", liveStatsFromAPI);
         setLiveStats(liveStatsFromAPI);
       } else {
         console.log("⚠️ No live stats from API, setting defaults");
@@ -383,7 +449,12 @@ export default function AttendancePage() {
   // Set initial date after mount to avoid hydration issues
   useEffect(() => {
     setMounted(true);
-    setSelectedDate(new Date().toISOString().split("T")[0]);
+    // Use local date to avoid timezone issues
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    setSelectedDate(`${year}-${month}-${day}`);
   }, []);
 
   useEffect(() => {
@@ -806,7 +877,7 @@ export default function AttendancePage() {
     getSortedRowModel: getSortedRowModel(),
     initialState: {
       pagination: {
-        pageSize: 50,
+        pageSize: 100,
       },
     },
   });
@@ -820,27 +891,57 @@ export default function AttendancePage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 h-full p-6">
+    <div className="flex flex-col gap-4 h-full p-6 min-h-0">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
+          <h1 className="text-2xl font-bold tracking-tight">
             Sistema de Gestión de Asistencia Empresarial
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Panel administrativo para monitoreo y gestión de asistencia
             corporativa
           </p>
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="w-40"
-          />
-          <div className="flex gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-32 justify-start text-left font-normal"
+              >
+                <CalendarDays className="mr-2 h-4 w-4" />
+                {selectedDate ? format(new Date(selectedDate + 'T12:00:00'), "dd/MM/yyyy") : "Seleccionar fecha"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={selectedDate ? new Date(selectedDate + 'T12:00:00') : undefined}
+                onSelect={(date: Date | undefined) => {
+                  if (date) {
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    setSelectedDate(`${year}-${month}-${day}`);
+                  } else {
+                    setSelectedDate("");
+                  }
+                }}
+                initialFocus
+                formatters={{
+                  formatMonthDropdown: (date: Date) =>
+                    date.toLocaleString("es", { month: "long" }),
+                  formatCaption: (date: Date) =>
+                    date.toLocaleString("es", { month: "long", year: "numeric" }),
+                  formatWeekdayName: (date: Date) =>
+                    date.toLocaleString("es", { weekday: "short" }),
+                }}
+              />
+            </PopoverContent>
+          </Popover>
+          <div className="flex gap-2 flex-shrink-0">
             <Dialog open={showCreateModal} onOpenChange={(open) => {
               setShowCreateModal(open);
               if (!open) {
@@ -852,15 +953,18 @@ export default function AttendancePage() {
                   time: "",
                   user_id: 0,
                 });
+                setUserSearchTerm("");
+                setShowUserDropdown(false);
               }
             }}>
               <DialogTrigger asChild>
-                <Button>
+                <Button size="sm">
                   <Plus className="h-4 w-4 mr-2" />
                   Nuevo Check-in
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
+              <DialogContent className="sm:max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
+                <div>
                 <DialogHeader>
                   <DialogTitle>Crear Check-in</DialogTitle>
                   <DialogDescription>
@@ -870,36 +974,63 @@ export default function AttendancePage() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label>Usuario</Label>
-                    <Select
-                      value={createForm.user_id.toString()}
-                      onValueChange={(value) => {
-                        const userId = parseInt(value);
-                        const currentLocationType = createForm.locations[0].location_type;
-                        const autoLocationDetail = autoPopulateLocationDetails(userId, currentLocationType);
-                        
-                        setCreateForm((prev) => ({
-                          ...prev,
-                          user_id: userId,
-                          locations: [
-                            {
-                              ...prev.locations[0],
-                              location_detail: autoLocationDetail,
-                            },
-                          ],
-                        }));
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar usuario" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {allUsers.map((user) => (
-                          <SelectItem key={user.id} value={user.id.toString()}>
-                            {user.name} - {user.email}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="relative" ref={userSearchRef}>
+                      <Input
+                        placeholder="Buscar usuario..."
+                        value={userSearchTerm}
+                        onChange={(e) => {
+                          setUserSearchTerm(e.target.value);
+                          setShowUserDropdown(true);
+                        }}
+                        onFocus={() => {
+                          setShowUserDropdown(true);
+                        }}
+
+                        className="w-full"
+                      />
+                      {showUserDropdown && (
+                        <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-auto">
+                          {displayUsers.length > 0 ? (
+                            displayUsers.map((user) => (
+                              <div
+                                key={user.id}
+                                className="px-3 py-2 hover:bg-muted cursor-pointer border-b border-border last:border-b-0"
+                                onClick={() => {
+                                  const currentLocationType = createForm.locations[0].location_type;
+                                  const autoLocationDetail = autoPopulateLocationDetails(user.id, currentLocationType);
+                                  
+                                  setCreateForm((prev) => ({
+                                    ...prev,
+                                    user_id: user.id,
+                                    locations: [
+                                      {
+                                        ...prev.locations[0],
+                                        location_detail: autoLocationDetail,
+                                      },
+                                    ],
+                                  }));
+                                  setUserSearchTerm(user.name);
+                                  setShowUserDropdown(false);
+                                }}
+                              >
+                                <div className="font-medium">{user.name}</div>
+                                <div className="text-sm text-muted-foreground">{user.email}</div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="px-3 py-2 text-muted-foreground">
+                              {userSearchTerm ? "No se encontraron usuarios disponibles" : "No hay usuarios disponibles para check-in"}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                    </div>
+                    {createForm.user_id > 0 && (
+                      <div className="text-sm text-muted-foreground mt-1">
+                        Usuario seleccionado: {allUsers.find(u => u.id === createForm.user_id)?.name}
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label>Fecha y Hora</Label>
@@ -1042,10 +1173,12 @@ export default function AttendancePage() {
                     </Button>
                   </div>
                 </div>
+                </div>
               </DialogContent>
             </Dialog>
             <Button
               variant="outline"
+              size="sm"
               onClick={() => fetchAttendanceData(selectedDate)}
               disabled={loading}
             >
@@ -1056,6 +1189,7 @@ export default function AttendancePage() {
             </Button>
             <Button
               variant="outline"
+              size="sm"
               onClick={() => {
                 // Set export date to the currently selected date
                 const currentDate = selectedDate || new Date().toISOString().split("T")[0];
@@ -1073,159 +1207,162 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      {/* Resumen diario */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Registros
-            </CardTitle>
+      {/* Resumen diario - Compact cards */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <Card className="p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Total Registros</p>
+              <p className="text-lg font-bold">
+                {loading ? "..." : liveStats?.total_employees || 0}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                de {liveStats?.total_employees || 0} empleados
+              </p>
+            </div>
             <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {loading ? "..." : liveStats?.total_employees || 0}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              de {liveStats?.total_employees || 0} empleados
-            </p>
-          </CardContent>
+          </div>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">A Tiempo</CardTitle>
+        <Card className="p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">A Tiempo</p>
+              <p className="text-lg font-bold text-green-600">
+                {loading ? "..." : liveStats?.present_today || 0}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {liveStats && liveStats.total_employees > 0
+                  ? Math.round((liveStats.present_today / liveStats.total_employees) * 100)
+                  : 0}
+                % puntualidad
+              </p>
+            </div>
             <Clock className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {loading ? "..." : liveStats?.present_today || 0}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {liveStats && liveStats.total_employees > 0
-                ? Math.round((liveStats.present_today / liveStats.total_employees) * 100)
-                : 0}
-              % puntualidad
-            </p>
-          </CardContent>
+          </div>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tardanzas</CardTitle>
+        <Card className="p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Tardanzas</p>
+              <p className="text-lg font-bold text-yellow-600">
+                {loading ? "..." : liveStats?.absent_today || 0}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {liveStats && liveStats.total_employees > 0
+                  ? Math.round((liveStats.absent_today / liveStats.total_employees) * 100)
+                  : 0}
+                % tardanzas
+              </p>
+            </div>
             <Clock className="h-4 w-4 text-yellow-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">
-              {loading ? "..." : liveStats?.absent_today || 0}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {liveStats && liveStats.total_employees > 0
-                ? Math.round((liveStats.absent_today / liveStats.total_employees) * 100)
-                : 0}
-              % tardanzas
-            </p>
-          </CardContent>
+          </div>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tiempo Extra</CardTitle>
+        <Card className="p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Tiempo Extra</p>
+              <p className="text-lg font-bold text-blue-600">0</p>
+              <p className="text-xs text-muted-foreground">
+                registros con sobretiem
+              </p>
+            </div>
             <Clock className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              0
-            </div>
-            <p className="text-xs text-muted-foreground">
-              registros con sobretiem
-            </p>
-          </CardContent>
+          </div>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Productividad</CardTitle>
-            <CalendarDays className="h-4 w-4 text-purple-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-600">
-              {liveStats && liveStats.total_employees > 0
-                ? Math.round((liveStats.present_today / liveStats.total_employees) * 100)
-                : 0}
-              %
+        <Card className="p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Productividad</p>
+              <p className="text-lg font-bold text-purple-600">
+                {liveStats && liveStats.total_employees > 0
+                  ? Math.round((liveStats.present_today / liveStats.total_employees) * 100)
+                  : 0}
+                %
+              </p>
+              <p className="text-xs text-muted-foreground">índice general</p>
             </div>
-            <p className="text-xs text-muted-foreground">índice general</p>
-          </CardContent>
+            <CalendarDays className="h-4 w-4 text-purple-600" />
+          </div>
         </Card>
       </div>
 
-      {/* Filtros y búsqueda */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filtros de Búsqueda</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nombre o email..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
-                />
-              </div>
-            </div>
-            <Select
-              value={statusFilter}
-              onValueChange={(value: "all" | "late" | "ontime" | "overtime") =>
-                setStatusFilter(value)
-              }
-            >
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los Estados</SelectItem>
-                <SelectItem value="ontime">A Tiempo</SelectItem>
-                <SelectItem value="late">Tardanzas</SelectItem>
-                <SelectItem value="overtime">Tiempo Extra</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={locationFilter}
-              onValueChange={(value: "all" | "remote_declared" | "remote_alternative" | "client" | "office") =>
-                setLocationFilter(value)
-              }
-            >
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas las Ubicaciones</SelectItem>
-                <SelectItem value="remote_declared">🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_DECLARED]}</SelectItem>
-                <SelectItem value="remote_alternative">🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_ALTERNATIVE]}</SelectItem>
-                <SelectItem value="client">🏭 {LOCATION_TYPE_LABELS[LOCATION_TYPES.CLIENT]}</SelectItem>
-                <SelectItem value="office">🏢 {LOCATION_TYPE_LABELS[LOCATION_TYPES.OFFICE]}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Filtros y búsqueda - Compact horizontal layout */}
+      <div className="flex flex-col sm:flex-row gap-3 items-center">
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nombre o email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-8"
+          />
+        </div>
+        <Select
+          value={statusFilter}
+          onValueChange={(value: "all" | "late" | "ontime" | "overtime") =>
+            setStatusFilter(value)
+          }
+        >
+          <SelectTrigger className="w-36">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los Estados</SelectItem>
+            <SelectItem value="ontime">A Tiempo</SelectItem>
+            <SelectItem value="late">Tardanzas</SelectItem>
+            <SelectItem value="overtime">Tiempo Extra</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select
+          value={locationFilter}
+          onValueChange={(value: "all" | "remote_declared" | "remote_alternative" | "client" | "office") =>
+            setLocationFilter(value)
+          }
+        >
+          <SelectTrigger className="w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas las Ubicaciones</SelectItem>
+            <SelectItem value="remote_declared">🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_DECLARED]}</SelectItem>
+            <SelectItem value="remote_alternative">🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_ALTERNATIVE]}</SelectItem>
+            <SelectItem value="client">🏭 {LOCATION_TYPE_LABELS[LOCATION_TYPES.CLIENT]}</SelectItem>
+            <SelectItem value="office">🏢 {LOCATION_TYPE_LABELS[LOCATION_TYPES.OFFICE]}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       {/* Tabla principal con React Table */}
-      <Card className="flex-1">
-        <CardHeader>
-          <CardTitle>Registros de Asistencia - {selectedDate}</CardTitle>
-          <CardDescription>
-            {loading
-              ? "Cargando registros..."
-              : `${filteredData.length} de ${checkins.length} registros`}
-          </CardDescription>
+      <Card className="flex-1 flex flex-col min-h-0">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg">Registros de Asistencia - {selectedDate}</CardTitle>
+              <CardDescription className="text-sm">
+                {loading
+                  ? "Cargando registros..."
+                  : `${filteredData.length} de ${checkins.length} registros`}
+              </CardDescription>
+            </div>
+            {successMessage && (
+              <div className="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded text-sm flex items-center gap-2">
+                <span>{successMessage}</span>
+                <button
+                  onClick={() => setSuccessMessage(null)}
+                  className="text-green-500 hover:text-green-700 cursor-pointer"
+                  aria-label="Cerrar mensaje de éxito"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0 flex-1 flex flex-col min-h-0">
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4 flex items-start justify-between">
               <span>{error}</span>
@@ -1233,19 +1370,6 @@ export default function AttendancePage() {
                 onClick={() => setError(null)}
                 className="ml-4 text-red-500 hover:text-red-700 flex-shrink-0 cursor-pointer"
                 aria-label="Cerrar mensaje de error"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          )}
-
-          {successMessage && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-4 flex items-start justify-between">
-              <span>{successMessage}</span>
-              <button
-                onClick={() => setSuccessMessage(null)}
-                className="ml-4 text-green-500 hover:text-green-700 flex-shrink-0 cursor-pointer"
-                aria-label="Cerrar mensaje de éxito"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -1280,54 +1404,56 @@ export default function AttendancePage() {
             </div>
           ) : (
             <>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    {table.getHeaderGroups().map((headerGroup) => (
-                      <TableRow key={headerGroup.id}>
-                        {headerGroup.headers.map((header) => (
-                          <TableHead key={header.id} className="font-semibold">
-                            {header.isPlaceholder
-                              ? null
-                              : flexRender(
-                                  header.column.columnDef.header,
-                                  header.getContext()
-                                )}
-                          </TableHead>
-                        ))}
-                      </TableRow>
-                    ))}
-                  </TableHeader>
-                  <TableBody>
-                    {table.getRowModel().rows?.length ? (
-                      table.getRowModel().rows.map((row) => (
-                        <TableRow key={row.id} className="hover:bg-muted/50">
-                          {row.getVisibleCells().map((cell) => (
-                            <TableCell key={cell.id}>
-                              {flexRender(
-                                cell.column.columnDef.cell,
-                                cell.getContext()
-                              )}
-                            </TableCell>
+              <div className="rounded-md border flex-1 flex flex-col min-h-0">
+                <div className="flex-1 overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      {table.getHeaderGroups().map((headerGroup) => (
+                        <TableRow key={headerGroup.id}>
+                          {headerGroup.headers.map((header) => (
+                            <TableHead key={header.id} className="font-semibold">
+                              {header.isPlaceholder
+                                ? null
+                                : flexRender(
+                                    header.column.columnDef.header,
+                                    header.getContext()
+                                  )}
+                            </TableHead>
                           ))}
                         </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell
-                          colSpan={columns.length}
-                          className="h-24 text-center"
-                        >
-                          No hay resultados.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                      ))}
+                    </TableHeader>
+                    <TableBody>
+                      {table.getRowModel().rows?.length ? (
+                        table.getRowModel().rows.map((row) => (
+                          <TableRow key={row.id} className="hover:bg-muted/50">
+                            {row.getVisibleCells().map((cell) => (
+                              <TableCell key={cell.id}>
+                                {flexRender(
+                                  cell.column.columnDef.cell,
+                                  cell.getContext()
+                                )}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell
+                            colSpan={columns.length}
+                            className="h-24 text-center"
+                          >
+                            No hay resultados.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
 
               {/* Paginación */}
-              <div className="flex items-center justify-between space-x-2 py-4">
+              <div className="flex items-center justify-between space-x-2 py-4 mt-auto">
                 <div className="text-sm text-muted-foreground">
                   Mostrando{" "}
                   {table.getState().pagination.pageIndex *

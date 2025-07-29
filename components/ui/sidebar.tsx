@@ -234,8 +234,8 @@ function Sidebar({
             : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
           // Adjust the padding for floating and inset variants.
           variant === "floating" || variant === "inset"
-            ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
-            : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
+            ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)] group-data-[side=left]:border-r-2 group-data-[side=left]:border-r-orange-500 group-data-[side=right]:border-l-2 group-data-[side=right]:border-l-orange-500"
+            : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r-2 group-data-[side=left]:border-r-orange-500 group-data-[side=right]:border-l-2 group-data-[side=right]:border-l-orange-500",
           className
         )}
         {...props}
@@ -243,7 +243,7 @@ function Sidebar({
         <div
           data-sidebar="sidebar"
           data-slot="sidebar-inner"
-          className="rounded-2xl bg-sidebar group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm dark:shadow-[1px_0px_8px_1px_rgba(249,115,22,0.5)] shadow-[1px_0px_4px_1px_rgba(249,115,22,0.8)]"
+          className="bg-sidebar flex h-full w-full flex-col"
         >
           {children}
         </div>
@@ -309,7 +309,7 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
       data-slot="sidebar-inset"
       className={cn(
         "bg-background relative flex w-full flex-1 flex-col",
-        "md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2 dark:shadow-[1px_0px_8px_1px_rgba(249,115,22,0.5)] shadow-[1px_0px_8px_1px_rgba(249,115,22,1)]",
+        "md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-0",
         className
       )}
       {...props}
