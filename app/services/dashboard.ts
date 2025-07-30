@@ -19,8 +19,11 @@ export async function authenticatedFetch(
   const token = localStorage.getItem("accessToken");
 
   if (!token) {
+    console.error("❌ No access token found in localStorage");
     throw new Error("No access token found");
   }
+
+  console.log(`🌐 API Call: ${API_BASE_URL}${endpoint}`);
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
@@ -29,6 +32,8 @@ export async function authenticatedFetch(
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
+    mode: "cors",
+    credentials: "include",
   });
 
   if (!response.ok) {

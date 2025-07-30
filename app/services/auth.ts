@@ -6,6 +6,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export async function loginUser(data: LoginFormValues): Promise<LoginResponse> {
   try {
+    console.log(`🔐 Attempting login to: ${API_BASE_URL}/auth/login`);
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: "POST",
       headers: {
@@ -14,6 +15,7 @@ export async function loginUser(data: LoginFormValues): Promise<LoginResponse> {
       },
       body: JSON.stringify(data),
       credentials: "include",
+      mode: "cors",
     });
 
     // Verificar el tipo de contenido antes de hacer .json()
