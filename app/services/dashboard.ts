@@ -713,3 +713,12 @@ export function generateExportFilename(
     return `ART_checkins${dateSuffix || `_${timestamp}`}.xlsx`;
   }
 }
+
+// Catalog APIs
+export async function getAbsenceTypes() {
+  return authenticatedFetch("/api/catalogs/absence-types");
+}
+
+export async function getLocationTypes() {
+  return authenticatedFetch("/api/catalogs/location-types");
+}

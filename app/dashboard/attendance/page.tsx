@@ -42,9 +42,12 @@ import {
   getUserById,
   downloadFile,
   generateExportFilename,
+  getLocationTypes,
+  getAbsenceTypes,
 } from "@/app/services/dashboard";
 import { useUser } from "@/app/contexts/UserContext";
 import { LOCATION_TYPE_LABELS, LOCATION_TYPES } from "@/app/constants/enums";
+import { CatalogLocationType, CatalogAbsenceType } from "@/app/types/api";
 import {
   Dialog,
   DialogContent,
@@ -243,6 +246,11 @@ export default function AttendancePage() {
     "all" | "remote_declared" | "remote_alternative" | "client" | "office"
   >("all");
 
+  // Estados para catálogos dinámicos
+  const [locationTypes, setLocationTypes] = useState<CatalogLocationType[]>([]);
+  const [absenceTypes, setAbsenceTypes] = useState<CatalogAbsenceType[]>([]);
+  const [catalogsLoading, setCatalogsLoading] = useState(true);
+
   // Estados de modales
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -376,6 +384,24 @@ export default function AttendancePage() {
     };
   }, [showUserDropdown]);
 
+  // Load catalogs from API
+  const loadCatalogs = useCallback(async () => {
+    try {
+      setCatalogsLoading(true);
+      const [locationTypesData, absenceTypesData] = await Promise.all([
+        getLocationTypes(),
+        getAbsenceTypes(),
+      ]);
+      setLocationTypes(locationTypesData || []);
+      setAbsenceTypes(absenceTypesData || []);
+    } catch (error) {
+      console.error("Error loading catalogs:", error);
+      setError("Error al cargar los catálogos");
+    } finally {
+      setCatalogsLoading(false);
+    }
+  }, []);
+
   const fetchAttendanceData = useCallback(async (date: string) => {
     try {
       setLoading(true);
@@ -465,6 +491,13 @@ export default function AttendancePage() {
       fetchAttendanceData(selectedDate);
     }
   }, [selectedDate, user, fetchAttendanceData, mounted]);
+
+  // Load catalogs on mount
+  useEffect(() => {
+    if (user) {
+      loadCatalogs();
+    }
+  }, [user, loadCatalogs]);
 
   // Funciones de manejo de formularios
   const handleEditCheckin = useCallback(async (checkin: CheckinRecord) => {
@@ -722,6 +755,15 @@ export default function AttendancePage() {
           }
 
           const getLocationInfo = (type: number) => {
+            // Use dynamic catalogs if available, fallback to hardcoded enums
+            if (locationTypes.length > 0) {
+              const locationType = locationTypes.find(lt => lt.id === type);
+              if (locationType) {
+                return { icon: "📍", label: locationType.name };
+              }
+            }
+            
+            // Fallback to hardcoded enums
             switch (type) {
               case LOCATION_TYPES.REMOTE_DECLARED:
                 return { icon: "🏠", label: LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_DECLARED] };
@@ -1084,18 +1126,30 @@ export default function AttendancePage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value={LOCATION_TYPES.OFFICE.toString()}>
-                          🏢 {LOCATION_TYPE_LABELS[LOCATION_TYPES.OFFICE]}
-                        </SelectItem>
-                        <SelectItem value={LOCATION_TYPES.REMOTE_DECLARED.toString()}>
-                          🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_DECLARED]}
-                        </SelectItem>
-                        <SelectItem value={LOCATION_TYPES.REMOTE_ALTERNATIVE.toString()}>
-                          🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_ALTERNATIVE]}
-                        </SelectItem>
-                        <SelectItem value={LOCATION_TYPES.CLIENT.toString()}>
-                          🏢 {LOCATION_TYPE_LABELS[LOCATION_TYPES.CLIENT]}
-                        </SelectItem>
+                        {locationTypes.length > 0 ? (
+                          // Use dynamic catalogs
+                          locationTypes.map((locationType) => (
+                            <SelectItem key={locationType.id} value={locationType.id.toString()}>
+                              📍 {locationType.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          // Fallback to hardcoded enums
+                          <>
+                            <SelectItem value={LOCATION_TYPES.OFFICE.toString()}>
+                              🏢 {LOCATION_TYPE_LABELS[LOCATION_TYPES.OFFICE]}
+                            </SelectItem>
+                            <SelectItem value={LOCATION_TYPES.REMOTE_DECLARED.toString()}>
+                              🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_DECLARED]}
+                            </SelectItem>
+                            <SelectItem value={LOCATION_TYPES.REMOTE_ALTERNATIVE.toString()}>
+                              🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_ALTERNATIVE]}
+                            </SelectItem>
+                            <SelectItem value={LOCATION_TYPES.CLIENT.toString()}>
+                              🏢 {LOCATION_TYPE_LABELS[LOCATION_TYPES.CLIENT]}
+                            </SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1604,18 +1658,30 @@ export default function AttendancePage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={LOCATION_TYPES.OFFICE.toString()}>
-                    🏢 {LOCATION_TYPE_LABELS[LOCATION_TYPES.OFFICE]}
-                  </SelectItem>
-                  <SelectItem value={LOCATION_TYPES.REMOTE_DECLARED.toString()}>
-                    🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_DECLARED]}
-                  </SelectItem>
-                  <SelectItem value={LOCATION_TYPES.REMOTE_ALTERNATIVE.toString()}>
-                    🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_ALTERNATIVE]}
-                  </SelectItem>
-                  <SelectItem value={LOCATION_TYPES.CLIENT.toString()}>
-                    🏢 {LOCATION_TYPE_LABELS[LOCATION_TYPES.CLIENT]}
-                  </SelectItem>
+                  {locationTypes.length > 0 ? (
+                    // Use dynamic catalogs
+                    locationTypes.map((locationType) => (
+                      <SelectItem key={locationType.id} value={locationType.id.toString()}>
+                        📍 {locationType.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    // Fallback to hardcoded enums
+                    <>
+                      <SelectItem value={LOCATION_TYPES.OFFICE.toString()}>
+                        🏢 {LOCATION_TYPE_LABELS[LOCATION_TYPES.OFFICE]}
+                      </SelectItem>
+                      <SelectItem value={LOCATION_TYPES.REMOTE_DECLARED.toString()}>
+                        🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_DECLARED]}
+                      </SelectItem>
+                      <SelectItem value={LOCATION_TYPES.REMOTE_ALTERNATIVE.toString()}>
+                        🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_ALTERNATIVE]}
+                      </SelectItem>
+                      <SelectItem value={LOCATION_TYPES.CLIENT.toString()}>
+                        🏢 {LOCATION_TYPE_LABELS[LOCATION_TYPES.CLIENT]}
+                      </SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>

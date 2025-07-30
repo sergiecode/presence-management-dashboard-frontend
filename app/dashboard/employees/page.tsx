@@ -1067,7 +1067,7 @@ export default function EmployeesPage() {
               <div>
                 <p className="text-xs text-muted-foreground">Usuarios Activos</p>
                 <p className="text-lg font-bold text-green-600">
-                  {users.filter((u) => u.active).length}
+                  {users.filter((u) => u.active && !u.pending_approval).length}
                 </p>
               </div>
               <CheckCircle className="h-4 w-4 text-green-600" />

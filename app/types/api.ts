@@ -220,3 +220,22 @@ export interface ExportFilters extends DateFilters {
   team_id?: number;
   format?: "csv" | "excel";
 }
+
+// Catalog Types
+export interface CatalogAbsenceType {
+  id: number;
+  name: string;
+  description?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CatalogLocationType {
+  id: number;
+  name: string;
+  description?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
