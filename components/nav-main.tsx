@@ -33,11 +33,11 @@ export function NavMain({ items }: NavMainProps) {
           <SidebarMenuItem key={item.title}>
             <SidebarMenuButton
               asChild
-              className={`data-[slot=sidebar-menu-button]:p-2 transition-colors rounded-md hover:bg-muted ${
+              className={`data-[slot=sidebar-menu-button]:p-1.5 mx-2 transition-colors rounded-md hover:bg-muted ${
                 isActive ? "bg-muted text-primary hover:bg-muted" : ""
               }`}
             >
-              <Link href={item.url} className="flex items-center gap-2">
+              <Link href={item.url} className="flex items-center gap-2 w-full">
                 <item.icon className="h-5 w-5 shrink-0" />
                 <span className="text-sm">{item.title}</span>
               </Link>

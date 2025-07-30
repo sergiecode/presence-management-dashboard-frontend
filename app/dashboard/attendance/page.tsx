@@ -400,14 +400,17 @@ export default function AttendancePage() {
       // Obtener estadísticas en vivo del backend
       let liveStatsFromAPI: LiveStats | null = null;
       try {
-        const response = await getDashboardSummary();
+        console.log("📅 Fetching live stats for date:", date);
+        const response = await getDashboardSummary(date);
         
         // The API returns the data directly, not wrapped in a data property
         if (response && typeof response === 'object') {
           if ('absent_today' in response && 'total_employees' in response) {
             liveStatsFromAPI = response as LiveStats;
+            console.log("✅ Live stats received:", liveStatsFromAPI);
           } else if ('data' in response && response.data) {
             liveStatsFromAPI = response.data as LiveStats;
+            console.log("✅ Live stats received:", liveStatsFromAPI);
           } else {
             console.log("❌ Response doesn't match expected format:", response);
             console.log("Response keys:", Object.keys(response));

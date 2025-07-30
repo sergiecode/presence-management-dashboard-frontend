@@ -39,8 +39,17 @@ export async function authenticatedFetch(
 }
 
 // Dashboard Summary APIs
-export async function getDashboardSummary() {
-  return authenticatedFetch(`/api/dashboard/attendance/live-stats`);
+export async function getDashboardSummary(date?: string) {
+  const params = new URLSearchParams();
+  if (date) {
+    params.append("date", date);
+  }
+  const queryString = params.toString();
+  const url = `/api/dashboard/attendance/live-stats${
+    queryString ? `?${queryString}` : ""
+  }`;
+  console.log("🌐 Calling live-stats API:", url);
+  return authenticatedFetch(url);
 }
 
 export async function getUsersStats() {
