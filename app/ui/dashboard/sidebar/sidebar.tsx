@@ -9,7 +9,7 @@ import {
 import styles from "./sidebar.module.css";
 import { MenuSection } from '@/app/types/menu';
 import MenuLink from './menuLink/menuLink';
-import { useAuth } from '@/app/hooks/useAuth'
+import { useAuth } from '@/hooks/useAuth'
 
 const menuItems: MenuSection[] = [
   {
