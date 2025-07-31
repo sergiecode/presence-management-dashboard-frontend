@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   CalendarDays,
   Clock,
@@ -23,6 +24,7 @@ import {
   Users,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   X,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -47,6 +49,7 @@ import {
 } from "@/app/services/dashboard";
 import { useUser } from "@/app/contexts/UserContext";
 import { LOCATION_TYPE_LABELS, LOCATION_TYPES } from "@/app/constants/enums";
+import { toast } from "sonner";
 import { CatalogLocationType, CatalogAbsenceType } from "@/app/types/api";
 import {
   Dialog,
@@ -65,6 +68,11 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   useReactTable,
   getCoreRowModel,
@@ -164,7 +172,7 @@ interface LiveStats {
 }
 
 export default function AttendancePage() {
-  const { user } = useUser();
+  const { user, loading: userLoading } = useUser();
 
   // Utility function to format time in user's timezone
   const formatTimeInUserTimezone = useCallback((timeString: string | null, fallback = "-") => {
@@ -234,8 +242,6 @@ export default function AttendancePage() {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportingType, setExportingType] = useState<'attendance' | 'checkins' | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -268,6 +274,10 @@ export default function AttendancePage() {
   const [exportStartDate, setExportStartDate] = useState(
     new Date().toISOString().split("T")[0]
   );
+
+  // Estado para el date picker
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showCreateDatePicker, setShowCreateDatePicker] = useState(false);
 
   // Estados de formularios
   const [createForm, setCreateForm] = useState<CreateCheckinData>({
@@ -385,27 +395,26 @@ export default function AttendancePage() {
   }, [showUserDropdown]);
 
   // Load catalogs from API
-  const loadCatalogs = useCallback(async () => {
-    try {
-      setCatalogsLoading(true);
-      const [locationTypesData, absenceTypesData] = await Promise.all([
-        getLocationTypes(),
-        getAbsenceTypes(),
-      ]);
-      setLocationTypes(locationTypesData || []);
-      setAbsenceTypes(absenceTypesData || []);
-    } catch (error) {
-      console.error("Error loading catalogs:", error);
-      setError("Error al cargar los catálogos");
-    } finally {
-      setCatalogsLoading(false);
-    }
-  }, []);
+  // const loadCatalogs = useCallback(async () => {
+  //   try {
+  //     setCatalogsLoading(true);
+  //     const [locationTypesData, absenceTypesData] = await Promise.all([
+  //       getLocationTypes(),
+  //       getAbsenceTypes(),
+  //     ]);
+  //     setLocationTypes(locationTypesData || []);
+  //     setAbsenceTypes(absenceTypesData || []);
+  //   } catch (error) {
+  //     console.error("Error loading catalogs:", error);
+  //     toast.error("Error al cargar los catálogos");
+  //   } finally {
+  //     setCatalogsLoading(false);
+  //   }
+  // }, []);
 
   const fetchAttendanceData = useCallback(async (date: string) => {
     try {
       setLoading(true);
-      setError(null);
 
       // Obtener datos de check-ins usando la nueva API
       const attendanceData = await getAttendanceSummary({
@@ -463,7 +472,7 @@ export default function AttendancePage() {
       }
     } catch (err) {
       console.error("Error fetching attendance data:", err);
-      setError("Error al cargar los datos de asistencia");
+      toast.error("Error al cargar los datos de asistencia");
       setLiveStats({
         absent_today: 0,
         attendance_rate: 0,
@@ -493,11 +502,11 @@ export default function AttendancePage() {
   }, [selectedDate, user, fetchAttendanceData, mounted]);
 
   // Load catalogs on mount
-  useEffect(() => {
-    if (user) {
-      loadCatalogs();
-    }
-  }, [user, loadCatalogs]);
+  // useEffect(() => {
+  //   if (user) {
+  //     loadCatalogs();
+  //   }
+  // }, [user, loadCatalogs]); 
 
   // Funciones de manejo de formularios
   const handleEditCheckin = useCallback(async (checkin: CheckinRecord) => {
@@ -573,9 +582,27 @@ export default function AttendancePage() {
   }, [user]);
 
   const handleCreateCheckin = async () => {
+    // Validate user selection
+    if (!createForm.user_id || createForm.user_id === 0) {
+      toast.error("Debe seleccionar un usuario para crear el check-in");
+      return;
+    }
+
+    // Validate time
+    if (!createForm.time || createForm.time.trim() === "") {
+      toast.error("Debe seleccionar una fecha y hora para el check-in");
+      return;
+    }
+
     // Validate late_reason for late check-ins
     if (isTimeLate(createForm.time) && (!createForm.late_reason || createForm.late_reason.trim() === "")) {
-      setError("El motivo de tardanza es obligatorio para check-ins tardíos (después de las 8:00 AM)");
+      toast.error("El motivo de tardanza es obligatorio para check-ins tardíos (después de las 8:00 AM)");
+      return;
+    }
+
+    // Validate location
+    if (!createForm.locations[0].location_detail || createForm.locations[0].location_detail.trim() === "") {
+      toast.error("Debe especificar el detalle de ubicación");
       return;
     }
 
@@ -594,11 +621,14 @@ export default function AttendancePage() {
         time: "",
         user_id: 0,
       });
+      // Clear search state after successful creation
+      setUserSearchTerm("");
+      setShowUserDropdown(false);
       fetchAttendanceData(selectedDate);
-      setSuccessMessage("Check-in creado exitosamente");
+      toast.success("Check-in creado exitosamente");
     } catch (err) {
       console.error("Error creating checkin:", err);
-      setError("Error al crear el registro de asistencia");
+      toast.error("Error al crear el registro de asistencia");
     }
   };
 
@@ -607,13 +637,13 @@ export default function AttendancePage() {
     
     if (!editingCheckin.checkin_id) {
       console.error("Checkin ID is null or undefined:", editingCheckin);
-      setError("Error: ID de check-in no válido");
+      toast.error("Error: ID de check-in no válido");
       return;
     }
 
     // Validate late_reason for late check-ins
     if (editingCheckin.late && (!editForm.late_reason || editForm.late_reason.trim() === "")) {
-      setError("El motivo de tardanza es obligatorio para check-ins tardíos");
+      toast.error("El motivo de tardanza es obligatorio para check-ins tardíos");
       return;
     }
 
@@ -628,10 +658,10 @@ export default function AttendancePage() {
       setEditingCheckin(null);
       setEditForm({});
       fetchAttendanceData(selectedDate);
-      setSuccessMessage("Check-in actualizado exitosamente");
+      toast.success("Check-in actualizado exitosamente");
     } catch (err) {
       console.error("Error updating checkin:", err);
-      setError("Error al actualizar el registro de asistencia");
+      toast.error("Error al actualizar el registro de asistencia");
     }
   };
 
@@ -651,12 +681,12 @@ export default function AttendancePage() {
       downloadFile(blob, filename, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       
       setShowExportModal(false);
-      setSuccessMessage(
+      toast.success(
         `ART Asistencia exportado exitosamente (${dateToUse})`
       );
     } catch (err) {
       console.error("Error exporting data:", err);
-      setError("Error al exportar los datos");
+      toast.error("Error al exportar los datos");
     } finally {
       setExporting(false);
       setExportingType(null);
@@ -690,17 +720,37 @@ export default function AttendancePage() {
       columnHelper.accessor("checkin_time", {
         header: "Entrada",
         cell: (info) => (
-          <div className="font-mono text-sm">
-            {formatTimeInUserTimezone(info.getValue())}
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="font-mono text-sm cursor-help">
+                {formatTimeInUserTimezone(info.getValue())}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent className="bg-gray-900 text-white border border-gray-700 shadow-lg">
+              <p className="font-medium">Hora convertida a la zona horaria del usuario</p>
+              <p className="text-xs text-gray-300 mt-1">
+                {user?.user?.timezone ? `Configurada: ${user.user.timezone}` : "Por defecto: GMT-3 (Argentina)"}
+              </p>
+            </TooltipContent>
+          </Tooltip>
         ),
       }),
       columnHelper.accessor("checkout_time", {
         header: "Salida",
         cell: (info) => (
-          <div className="font-mono text-sm">
-            {formatTimeInUserTimezone(info.getValue())}
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="font-mono text-sm cursor-help">
+                {formatTimeInUserTimezone(info.getValue())}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent className="bg-gray-900 text-white border border-gray-700 shadow-lg">
+              <p className="font-medium">Hora convertida a la zona horaria del usuario</p>
+              <p className="text-xs text-gray-300 mt-1">
+                {user?.user?.timezone ? `Configurada: ${user.user.timezone}` : "Por defecto: GMT-3 (Argentina)"}
+              </p>
+            </TooltipContent>
+          </Tooltip>
         ),
       }),
       columnHelper.accessor("late", {
@@ -710,7 +760,14 @@ export default function AttendancePage() {
           const isOvertime = info.row.original.overtime;
           const hasCheckout = !!info.row.original.checkout_time;
 
-          if (isLate) {
+          // If user has checked out, show "Finalizado" regardless of late/overtime status
+          if (hasCheckout) {
+            return (
+              <Badge className="bg-gray-500/20 text-gray-700 border-gray-500/30">
+                Finalizado
+              </Badge>
+            );
+          } else if (isLate) {
             return (
               <Badge className="bg-yellow-500/20 text-yellow-700 border-yellow-500/30">
                 Tarde
@@ -720,12 +777,6 @@ export default function AttendancePage() {
             return (
               <Badge className="bg-blue-500/20 text-blue-700 border-blue-500/30">
                 Tiempo Extra
-              </Badge>
-            );
-          } else if (hasCheckout) {
-            return (
-              <Badge className="bg-gray-500/20 text-gray-700 border-gray-500/30">
-                Finalizado
               </Badge>
             );
           } else {
@@ -927,6 +978,20 @@ export default function AttendancePage() {
     },
   });
 
+  if (userLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="flex flex-col items-center space-y-4">
+          <Skeleton className="h-8 w-8 rounded-full" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-[200px]" />
+            <Skeleton className="h-4 w-[150px]" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -950,42 +1015,73 @@ export default function AttendancePage() {
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-32 justify-start text-left font-normal"
-              >
-                <CalendarDays className="mr-2 h-4 w-4" />
-                {selectedDate ? format(new Date(selectedDate + 'T12:00:00'), "dd/MM/yyyy") : "Seleccionar fecha"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={selectedDate ? new Date(selectedDate + 'T12:00:00') : undefined}
-                onSelect={(date: Date | undefined) => {
-                  if (date) {
-                    const year = date.getFullYear();
-                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                    const day = String(date.getDate()).padStart(2, '0');
-                    setSelectedDate(`${year}-${month}-${day}`);
-                  } else {
-                    setSelectedDate("");
+          <div className="relative flex gap-2">
+            <Input
+              value={selectedDate ? format(new Date(selectedDate + 'T12:00:00'), "dd/MM/yyyy") : ""}
+              placeholder="31/07/2025"
+              className="w-40 bg-background pr-10"
+              onChange={(e) => {
+                const inputValue = e.target.value;
+                // Parse DD/MM/YYYY format
+                const match = inputValue.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                if (match) {
+                  const [, day, month, year] = match;
+                  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                  if (!isNaN(date.getTime())) {
+                    const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                    setSelectedDate(formattedDate);
                   }
-                }}
-                initialFocus
-                formatters={{
-                  formatMonthDropdown: (date: Date) =>
-                    date.toLocaleString("es", { month: "long" }),
-                  formatCaption: (date: Date) =>
-                    date.toLocaleString("es", { month: "long", year: "numeric" }),
-                  formatWeekdayName: (date: Date) =>
-                    date.toLocaleString("es", { weekday: "short" }),
-                }}
-              />
-            </PopoverContent>
-          </Popover>
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setShowDatePicker(true);
+                }
+              }}
+            />
+            <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="absolute top-1/2 right-2 size-6 -translate-y-1/2"
+                >
+                  <CalendarDays className="size-3.5" />
+                  <span className="sr-only">Seleccionar fecha</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-auto overflow-hidden p-0"
+                align="end"
+                alignOffset={-8}
+                sideOffset={10}
+              >
+                <Calendar
+                  mode="single"
+                  selected={selectedDate ? new Date(selectedDate + 'T12:00:00') : undefined}
+                  captionLayout="dropdown"
+                  month={selectedDate ? new Date(selectedDate + 'T12:00:00') : undefined}
+                  onSelect={(date) => {
+                    if (date) {
+                      const year = date.getFullYear();
+                      const month = String(date.getMonth() + 1).padStart(2, '0');
+                      const day = String(date.getDate()).padStart(2, '0');
+                      setSelectedDate(`${year}-${month}-${day}`);
+                    }
+                    setShowDatePicker(false);
+                  }}
+                  formatters={{
+                    formatMonthDropdown: (date: Date) =>
+                      date.toLocaleString("es", { month: "long" }),
+                    formatCaption: (date: Date) =>
+                      date.toLocaleString("es", { month: "long", year: "numeric" }),
+                    formatWeekdayName: (date: Date) =>
+                      date.toLocaleString("es", { weekday: "short" }),
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
           <div className="flex gap-2 flex-shrink-0">
             <Dialog open={showCreateModal} onOpenChange={(open) => {
               setShowCreateModal(open);
@@ -1016,6 +1112,7 @@ export default function AttendancePage() {
                     Registrar asistencia para un empleado
                   </DialogDescription>
                 </DialogHeader>
+
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label>Usuario</Label>
@@ -1079,28 +1176,105 @@ export default function AttendancePage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Fecha y Hora</Label>
-                    <DateTimePicker
-                      date={createForm.time ? (() => {
-                        const date = new Date(createForm.time);
-                        return !isNaN(date.getTime()) ? date : undefined;
-                      })() : undefined}
-                      onDateChange={(date) =>
-                        setCreateForm((prev) => ({
-                          ...prev,
-                          time: date && !isNaN(date.getTime()) ? (() => {
-                            // Format the date in local timezone (not UTC)
-                            const year = date.getFullYear();
-                            const month = String(date.getMonth() + 1).padStart(2, '0');
-                            const day = String(date.getDate()).padStart(2, '0');
-                            const hours = String(date.getHours()).padStart(2, '0');
-                            const minutes = String(date.getMinutes()).padStart(2, '0');
-                            return `${year}-${month}-${day}T${hours}:${minutes}`;
-                          })() : "",
-                        }))
-                      }
-                      placeholder="Seleccionar fecha y hora"
-                      userTimezone={(user as { timezone?: string })?.timezone || "America/Argentina/Buenos_Aires"}
-                    />
+                    <div className="flex gap-4">
+                      <div className="flex flex-col gap-3 flex-1">
+                        <Label htmlFor="date-picker" className="px-1 text-sm">
+                          Fecha
+                        </Label>
+                        <Popover open={showCreateDatePicker} onOpenChange={setShowCreateDatePicker}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              id="date-picker"
+                              className="w-full justify-between font-normal"
+                            >
+                              {createForm.time ? (() => {
+                                const date = new Date(createForm.time);
+                                return !isNaN(date.getTime()) ? date.toLocaleDateString("es-ES") : "Seleccionar fecha";
+                              })() : "Seleccionar fecha"}
+                              <ChevronDown className="h-4 w-4" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto overflow-hidden p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={createForm.time ? new Date(createForm.time) : undefined}
+                              captionLayout="dropdown"
+                              onSelect={(date) => {
+                                if (date) {
+                                  // Get current time for the selected date
+                                  const now = new Date();
+                                  const hours = String(now.getHours()).padStart(2, '0');
+                                  const minutes = String(now.getMinutes()).padStart(2, '0');
+                                  
+                                  const year = date.getFullYear();
+                                  const month = String(date.getMonth() + 1).padStart(2, '0');
+                                  const day = String(date.getDate()).padStart(2, '0');
+                                  
+                                  setCreateForm((prev) => ({
+                                    ...prev,
+                                    time: `${year}-${month}-${day}T${hours}:${minutes}`,
+                                  }));
+                                }
+                                setShowCreateDatePicker(false);
+                              }}
+                              formatters={{
+                                formatMonthDropdown: (date: Date) =>
+                                  date.toLocaleString("es", { month: "long" }),
+                                formatCaption: (date: Date) =>
+                                  date.toLocaleString("es", { month: "long", year: "numeric" }),
+                                formatWeekdayName: (date: Date) =>
+                                  date.toLocaleString("es", { weekday: "short" }),
+                              }}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <div className="flex flex-col gap-3 flex-1">
+                        <Label htmlFor="time-picker" className="px-1 text-sm">
+                          Hora
+                        </Label>
+                        <Input
+                          type="time"
+                          id="time-picker"
+                          step="60"
+                          value={createForm.time ? (() => {
+                            const date = new Date(createForm.time);
+                            return !isNaN(date.getTime()) ? 
+                              `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}` : 
+                              "";
+                          })() : ""}
+                          onChange={(e) => {
+                            const timeValue = e.target.value;
+                            if (timeValue && createForm.time) {
+                              const [hours, minutes] = timeValue.split(':');
+                              const currentDate = new Date(createForm.time);
+                              const year = currentDate.getFullYear();
+                              const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                              const day = String(currentDate.getDate()).padStart(2, '0');
+                              
+                              setCreateForm((prev) => ({
+                                ...prev,
+                                time: `${year}-${month}-${day}T${hours}:${minutes}`,
+                              }));
+                            } else if (timeValue) {
+                              // If no date is selected, use today's date
+                              const today = new Date();
+                              const year = today.getFullYear();
+                              const month = String(today.getMonth() + 1).padStart(2, '0');
+                              const day = String(today.getDate()).padStart(2, '0');
+                              const [hours, minutes] = timeValue.split(':');
+                              
+                              setCreateForm((prev) => ({
+                                ...prev,
+                                time: `${year}-${month}-${day}T${hours}:${minutes}`,
+                              }));
+                            }
+                          }}
+                          className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                        />
+                      </div>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label>Tipo de Ubicación</Label>
@@ -1205,6 +1379,25 @@ export default function AttendancePage() {
                       </p>
                     </div>
                   )}
+                  {!isTimeLate(createForm.time) && createForm.late_reason && (
+                    <div className="space-y-2">
+                      <Label>Motivo de Tardanza</Label>
+                      <Textarea
+                        placeholder="Explicar el motivo de la tardanza..."
+                        value={createForm.late_reason}
+                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                          setCreateForm((prev) => ({
+                            ...prev,
+                            late_reason: e.target.value,
+                          }))
+                        }
+                        className="border-gray-200 focus:border-gray-500"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Opcional para check-ins a tiempo
+                      </p>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label>Notas</Label>
                     <Textarea
@@ -1225,8 +1418,15 @@ export default function AttendancePage() {
                     >
                       Cancelar
                     </Button>
-                    <Button onClick={handleCreateCheckin}>
-                      Crear Check-in
+                    <Button 
+                      onClick={handleCreateCheckin}
+                      disabled={!createForm.user_id || !createForm.time || !createForm.locations[0].location_detail}
+                      className={!createForm.user_id || !createForm.time || !createForm.locations[0].location_detail ? "opacity-50 cursor-not-allowed" : ""}
+                    >
+                      {!createForm.user_id ? "Hace falta seleccionar un usuario" : 
+                       !createForm.time ? "Hace falta seleccionar una fecha y hora" :
+                       !createForm.locations[0].location_detail ? "Hace falta completar la ubicación" :
+                       "Crear Check-in"}
                     </Button>
                   </div>
                 </div>
@@ -1270,9 +1470,13 @@ export default function AttendancePage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-muted-foreground">Total Registros</p>
-              <p className="text-lg font-bold">
-                {loading ? "..." : liveStats?.total_employees || 0}
-              </p>
+              {loading ? (
+                <Skeleton className="h-6 w-12 mb-1" />
+              ) : (
+                <p className="text-lg font-bold">
+                  {liveStats?.total_employees || 0}
+                </p>
+              )}
               <p className="text-xs text-muted-foreground">
                 de {liveStats?.total_employees || 0} empleados
               </p>
@@ -1285,9 +1489,13 @@ export default function AttendancePage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-muted-foreground">A Tiempo</p>
-              <p className="text-lg font-bold text-green-600">
-                {loading ? "..." : liveStats?.present_today || 0}
-              </p>
+              {loading ? (
+                <Skeleton className="h-6 w-12 mb-1" />
+              ) : (
+                <p className="text-lg font-bold text-green-600">
+                  {liveStats?.present_today || 0}
+                </p>
+              )}
               <p className="text-xs text-muted-foreground">
                 {liveStats && liveStats.total_employees > 0
                   ? Math.round((liveStats.present_today / liveStats.total_employees) * 100)
@@ -1303,9 +1511,13 @@ export default function AttendancePage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-muted-foreground">Tardanzas</p>
-              <p className="text-lg font-bold text-yellow-600">
-                {loading ? "..." : liveStats?.absent_today || 0}
-              </p>
+              {loading ? (
+                <Skeleton className="h-6 w-12 mb-1" />
+              ) : (
+                <p className="text-lg font-bold text-yellow-600">
+                  {liveStats?.absent_today || 0}
+                </p>
+              )}
               <p className="text-xs text-muted-foreground">
                 {liveStats && liveStats.total_employees > 0
                   ? Math.round((liveStats.absent_today / liveStats.total_employees) * 100)
@@ -1321,7 +1533,11 @@ export default function AttendancePage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-muted-foreground">Tiempo Extra</p>
-              <p className="text-lg font-bold text-blue-600">0</p>
+              {loading ? (
+                <Skeleton className="h-6 w-8 mb-1" />
+              ) : (
+                <p className="text-lg font-bold text-blue-600">0</p>
+              )}
               <p className="text-xs text-muted-foreground">
                 registros con sobretiem
               </p>
@@ -1334,12 +1550,16 @@ export default function AttendancePage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-muted-foreground">Productividad</p>
-              <p className="text-lg font-bold text-purple-600">
-                {liveStats && liveStats.total_employees > 0
-                  ? Math.round((liveStats.present_today / liveStats.total_employees) * 100)
-                  : 0}
-                %
-              </p>
+              {loading ? (
+                <Skeleton className="h-6 w-12 mb-1" />
+              ) : (
+                <p className="text-lg font-bold text-purple-600">
+                  {liveStats && liveStats.total_employees > 0
+                    ? Math.round((liveStats.present_today / liveStats.total_employees) * 100)
+                    : 0}
+                  %
+                </p>
+              )}
               <p className="text-xs text-muted-foreground">índice general</p>
             </div>
             <CalendarDays className="h-4 w-4 text-purple-600" />
@@ -1399,54 +1619,37 @@ export default function AttendancePage() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-lg">Registros de Asistencia - {selectedDate}</CardTitle>
-              <CardDescription className="text-sm">
-                {loading
-                  ? "Cargando registros..."
-                  : `${filteredData.length} de ${checkins.length} registros`}
-              </CardDescription>
+              {loading ? (
+                <Skeleton className="h-4 w-[200px] mt-1" />
+              ) : (
+                <CardDescription className="text-sm">
+                  {`${filteredData.length} de ${checkins.length} registros`}
+                </CardDescription>
+              )}
             </div>
-            {successMessage && (
-              <div className="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded text-sm flex items-center gap-2">
-                <span>{successMessage}</span>
-                <button
-                  onClick={() => setSuccessMessage(null)}
-                  className="text-green-500 hover:text-green-700 cursor-pointer"
-                  aria-label="Cerrar mensaje de éxito"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            )}
+
           </div>
         </CardHeader>
         <CardContent className="pt-0 flex-1 flex flex-col min-h-0">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4 flex items-start justify-between">
-              <span>{error}</span>
-              <button
-                onClick={() => setError(null)}
-                className="ml-4 text-red-500 hover:text-red-700 flex-shrink-0 cursor-pointer"
-                aria-label="Cerrar mensaje de error"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          )}
+
 
           {loading ? (
-            <div className="space-y-3">
-              {[...Array(10)].map((_, i) => (
-                <div
-                  key={i}
-                  className="animate-pulse flex space-x-4 p-4 border rounded"
-                >
-                  <div className="h-8 w-8 bg-gray-200 rounded-full"></div>
+            <div className="space-y-4">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="flex items-center space-x-4 p-4">
+                  <Skeleton className="h-8 w-8 rounded-full" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                    <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                    <Skeleton className="h-4 w-[200px]" />
+                    <Skeleton className="h-3 w-[150px]" />
                   </div>
-                  <div className="h-4 bg-gray-200 rounded w-20"></div>
-                  <div className="h-4 bg-gray-200 rounded w-20"></div>
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-[80px]" />
+                    <Skeleton className="h-4 w-[80px]" />
+                  </div>
+                  <Skeleton className="h-6 w-[100px] rounded-full" />
+                  <Skeleton className="h-4 w-[120px]" />
+                  <Skeleton className="h-4 w-[100px]" />
+                  <Skeleton className="h-8 w-8 rounded" />
                 </div>
               ))}
             </div>

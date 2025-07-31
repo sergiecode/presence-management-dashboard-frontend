@@ -14,6 +14,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -53,6 +59,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   useReactTable,
   getCoreRowModel,
@@ -74,6 +81,8 @@ import {
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  CalendarDays,
   X,
 } from "lucide-react";
 import {
@@ -85,6 +94,7 @@ import {
   updateUserCheckinConfig,
 } from "@/app/services/dashboard";
 import { useUser } from "@/app/contexts/UserContext";
+import { toast } from "sonner";
 
 interface User {
   id: number;
@@ -200,13 +210,12 @@ interface CheckinConfigForm {
 }
 
 export default function EmployeesPage() {
-  const { user } = useUser();
+  const { user, loading: userLoading } = useUser();
 
   // Estados principales
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -215,6 +224,8 @@ export default function EmployeesPage() {
   const [showHrModal, setShowHrModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showCheckinModal, setShowCheckinModal] = useState(false);
+  const [showBirthDatePicker, setShowBirthDatePicker] = useState(false);
+  const [showHireDatePicker, setShowHireDatePicker] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   // Estados de formularios
@@ -367,7 +378,6 @@ export default function EmployeesPage() {
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
-      setError(null);
 
       const response = await getUsers({ limit: 1000 });
 
@@ -380,7 +390,7 @@ export default function EmployeesPage() {
       }
     } catch (err) {
       console.error("Error fetching users:", err);
-      setError(
+      toast.error(
         "Error al cargar los usuarios: " +
           (err instanceof Error ? err.message : String(err))
       );
@@ -393,14 +403,14 @@ export default function EmployeesPage() {
     if (user && user.role === "admin") {
       fetchUsers();
     } else if (user && user.role !== "admin") {
-      setError("Solo los administradores pueden acceder a esta página");
+      toast.error("Solo los administradores pueden acceder a esta página");
     }
   }, [user, fetchUsers]);
 
   const handleCompleteHrDetails = useCallback(
     async (userId: number) => {
       if (users.length === 0) {
-        setError(
+        toast.error(
           "No se han cargado los usuarios. Por favor, haz clic en 'Actualizar' para cargar los datos."
         );
         return;
@@ -409,7 +419,7 @@ export default function EmployeesPage() {
       const userToEdit = users.find((u) => u.id === userId);
 
       if (!userToEdit) {
-        setError("Usuario no encontrado. Intenta actualizar la página.");
+        toast.error("Usuario no encontrado. Intenta actualizar la página.");
         return;
       }
 
@@ -509,7 +519,7 @@ export default function EmployeesPage() {
       });
       setShowEditModal(true);
     } catch (error) {
-      setError("Error al cargar los detalles del usuario");
+      toast.error("Error al cargar los detalles del usuario");
       console.error("Error loading user details:", error);
     }
   }, []);
@@ -517,7 +527,7 @@ export default function EmployeesPage() {
   const handleConfigCheckin = useCallback(
     (userId: number) => {
       if (users.length === 0) {
-        setError(
+        toast.error(
           "No se han cargado los usuarios. Por favor, haz clic en 'Actualizar' para cargar los datos."
         );
         return;
@@ -526,7 +536,7 @@ export default function EmployeesPage() {
       const userToConfig = users.find((u) => u.id === userId);
 
       if (!userToConfig) {
-        setError("Usuario no encontrado. Intenta actualizar la página.");
+        toast.error("Usuario no encontrado. Intenta actualizar la página.");
         return;
       }
 
@@ -546,7 +556,7 @@ export default function EmployeesPage() {
     if (!selectedUser) return;
 
     if (!validateHrForm()) {
-      setError("Por favor, completa todos los campos obligatorios marcados");
+      toast.error("Por favor, completa todos los campos obligatorios marcados");
       return;
     }
 
@@ -568,12 +578,12 @@ export default function EmployeesPage() {
       };
 
       await updateUserHrDetails(selectedUser.id, hrDataFormatted);
-      setMessage("Detalles de HR actualizados correctamente");
+      toast.success("Detalles de HR actualizados correctamente");
       setShowHrModal(false);
       setHrFormErrors([]);
       fetchUsers();
     } catch (error) {
-      setError("Error al actualizar los detalles de HR");
+      toast.error("Error al actualizar los detalles de HR");
       console.error("Error updating HR details:", error);
     }
   };
@@ -582,7 +592,7 @@ export default function EmployeesPage() {
     if (!selectedUser) return;
 
     if (!validateEditForm()) {
-      setError("Por favor, completa todos los campos obligatorios marcados");
+      toast.error("Por favor, completa todos los campos obligatorios marcados");
       return;
     }
 
@@ -596,12 +606,10 @@ export default function EmployeesPage() {
         return `${dateStr}T12:00:00Z`;
       };
 
-      // Usar todos los campos disponibles del PUT
+      // Usar todos los campos disponibles del PUT (excluyendo los de check-in que van en su propio endpoint)
       const updateData = {
         active: editForm.active,
         birth_date: formatDateForBackend(editForm.birth_date),
-        checkin_start_time: editForm.checkin_start_time,
-        checkout_end_time: editForm.checkout_end_time,
         cuil: editForm.cuil,
         dni: editForm.dni,
         email: editForm.email,
@@ -612,7 +620,6 @@ export default function EmployeesPage() {
         monthly_objective_days: editForm.monthly_objective_days,
         name: editForm.name,
         notes: editForm.notes,
-        notification_offset_min: editForm.notification_offset_min,
         office_days: editForm.office_days,
         on_site_required: editForm.on_site_required,
         phone: editForm.phone,
@@ -621,19 +628,18 @@ export default function EmployeesPage() {
         surname: editForm.surname,
         team: editForm.team,
         teams_access: editForm.teams_access,
-        timezone: editForm.timezone,
         weekly_hours: editForm.weekly_hours,
         weekly_objective_days: editForm.weekly_objective_days,
         zoho_access: editForm.zoho_access,
       };
 
       await updateUser(selectedUser.id, updateData);
-      setMessage("Usuario actualizado correctamente");
+      toast.success("Usuario actualizado correctamente");
       setShowEditModal(false);
       setEditFormErrors([]);
       fetchUsers();
     } catch (error) {
-      setError("Error al actualizar el usuario");
+      toast.error("Error al actualizar el usuario");
       console.error("Error updating user:", error);
     }
   };
@@ -642,18 +648,18 @@ export default function EmployeesPage() {
     if (!selectedUser) return;
 
     if (!validateCheckinForm()) {
-      setError("Por favor, completa todos los campos obligatorios marcados");
+      toast.error("Por favor, completa todos los campos obligatorios marcados");
       return;
     }
 
     try {
       await updateUserCheckinConfig(selectedUser.id, checkinConfigForm);
-      setMessage("Configuración de check-in actualizada correctamente");
+      toast.success("Configuración de check-in actualizada correctamente");
       setShowCheckinModal(false);
       setCheckinFormErrors([]);
       fetchUsers();
     } catch (error) {
-      setError("Error al actualizar la configuración de check-in");
+      toast.error("Error al actualizar la configuración de check-in");
       console.error("Error updating checkin config:", error);
     }
   };
@@ -662,10 +668,10 @@ export default function EmployeesPage() {
     async (userId: number) => {
       try {
         await deleteUser(userId);
-        setMessage("Usuario eliminado correctamente");
+        toast.success("Usuario eliminado correctamente");
         fetchUsers();
       } catch (error) {
-        setError("Error al eliminar el usuario");
+        toast.error("Error al eliminar el usuario");
         console.error("Error deleting user:", error);
       }
     },
@@ -968,6 +974,20 @@ export default function EmployeesPage() {
     },
   });
 
+  if (userLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="flex flex-col items-center space-y-4">
+          <Skeleton className="h-8 w-8 rounded-full" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-[200px]" />
+            <Skeleton className="h-4 w-[150px]" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -1007,24 +1027,9 @@ export default function EmployeesPage() {
           </div>
         </div>
 
-        {/* Mensajes */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4 flex justify-between items-center">
-            <span>{error}</span>
-            <Button size="sm" variant="ghost" onClick={() => setError(null)}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
 
-        {message && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-4 flex justify-between items-center">
-            <span>{message}</span>
-            <Button size="sm" variant="ghost" onClick={() => setMessage(null)}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
+
+
 
         {/* Estadísticas */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -1128,24 +1133,33 @@ export default function EmployeesPage() {
         <Card className="flex-1 flex flex-col min-h-0">
           <CardHeader>
             <CardTitle>Lista de Empleados</CardTitle>
-            <CardDescription>
-              {loading
-                ? "Cargando usuarios..."
-                : `${filteredData.length} de ${users.length} usuarios`}
-            </CardDescription>
+            {loading ? (
+              <Skeleton className="h-4 w-[200px] mt-1" />
+            ) : (
+              <CardDescription>
+                {`${filteredData.length} de ${users.length} usuarios`}
+              </CardDescription>
+            )}
           </CardHeader>
           <CardContent className="flex-1 flex flex-col min-h-0">
             {loading ? (
-              <div className="space-y-3">
-                {[...Array(10)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="animate-pulse flex space-x-4 p-4 border rounded"
-                  >
-                    <div className="h-10 w-10 bg-gray-200 rounded-full"></div>
+              <div className="space-y-4">
+                {[...Array(8)].map((_, i) => (
+                  <div key={i} className="flex items-center space-x-4 p-4">
+                    <Skeleton className="h-10 w-10 rounded-full" />
                     <div className="flex-1 space-y-2">
-                      <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                      <Skeleton className="h-4 w-[200px]" />
+                      <Skeleton className="h-3 w-[150px]" />
+                    </div>
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-[100px]" />
+                      <Skeleton className="h-4 w-[80px]" />
+                    </div>
+                    <Skeleton className="h-6 w-[80px] rounded-full" />
+                    <Skeleton className="h-4 w-[100px]" />
+                    <div className="flex space-x-2">
+                      <Skeleton className="h-8 w-8 rounded" />
+                      <Skeleton className="h-8 w-8 rounded" />
                     </div>
                   </div>
                 ))}
@@ -1322,42 +1336,170 @@ export default function EmployeesPage() {
                       Fecha de Nacimiento{" "}
                       <span className="text-red-500">*</span>
                     </Label>
-                    <Input
-                      type="date"
-                      value={hrForm.birth_date}
-                      onChange={(e) =>
-                        setHrForm((prev) => ({
-                          ...prev,
-                          birth_date: e.target.value,
-                        }))
-                      }
-                      className={
-                        hrFormErrors.some((e) => e.includes("nacimiento"))
-                          ? "border-red-500"
-                          : ""
-                      }
-                    />
+                    <div className="relative flex gap-2">
+                      <Input
+                        value={hrForm.birth_date ? (() => {
+                          const date = new Date(hrForm.birth_date);
+                          return !isNaN(date.getTime()) ? date.toLocaleDateString("es-ES") : "";
+                        })() : ""}
+                        placeholder="dd/mm/yyyy"
+                        className={`bg-background pr-10 ${
+                          hrFormErrors.some((e) => e.includes("nacimiento"))
+                            ? "border-red-500"
+                            : ""
+                        }`}
+                        onChange={(e) => {
+                          const inputValue = e.target.value;
+                          // Parse DD/MM/YYYY format
+                          const match = inputValue.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                          if (match) {
+                            const [, day, month, year] = match;
+                            const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                            if (!isNaN(date.getTime())) {
+                              const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                              setHrForm((prev) => ({
+                                ...prev,
+                                birth_date: formattedDate,
+                              }));
+                            }
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "ArrowDown") {
+                            e.preventDefault();
+                            setShowBirthDatePicker(true);
+                          }
+                        }}
+                      />
+                      <Popover open={showBirthDatePicker} onOpenChange={setShowBirthDatePicker}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            className="absolute top-1/2 right-2 size-6 -translate-y-1/2"
+                          >
+                            <CalendarDays className="size-3.5" />
+                            <span className="sr-only">Seleccionar fecha de nacimiento</span>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          className="w-auto overflow-hidden p-0"
+                          align="end"
+                          alignOffset={-8}
+                          sideOffset={10}
+                        >
+                          <Calendar
+                            mode="single"
+                            selected={hrForm.birth_date ? new Date(hrForm.birth_date) : undefined}
+                            captionLayout="dropdown"
+                            onSelect={(date) => {
+                              if (date) {
+                                const year = date.getFullYear();
+                                const month = String(date.getMonth() + 1).padStart(2, '0');
+                                const day = String(date.getDate()).padStart(2, '0');
+                                setHrForm((prev) => ({
+                                  ...prev,
+                                  birth_date: `${year}-${month}-${day}`,
+                                }));
+                              }
+                              setShowBirthDatePicker(false);
+                            }}
+                            formatters={{
+                              formatMonthDropdown: (date: Date) =>
+                                date.toLocaleString("es", { month: "long" }),
+                              formatCaption: (date: Date) =>
+                                date.toLocaleString("es", { month: "long", year: "numeric" }),
+                              formatWeekdayName: (date: Date) =>
+                                date.toLocaleString("es", { weekday: "short" }),
+                            }}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">
                       Fecha de Contratación{" "}
                       <span className="text-red-500">*</span>
                     </Label>
-                    <Input
-                      type="date"
-                      value={hrForm.hire_date}
-                      onChange={(e) =>
-                        setHrForm((prev) => ({
-                          ...prev,
-                          hire_date: e.target.value,
-                        }))
-                      }
-                      className={
-                        hrFormErrors.some((e) => e.includes("contratación"))
-                          ? "border-red-500"
-                          : ""
-                      }
-                    />
+                    <div className="relative flex gap-2">
+                      <Input
+                        value={hrForm.hire_date ? (() => {
+                          const date = new Date(hrForm.hire_date);
+                          return !isNaN(date.getTime()) ? date.toLocaleDateString("es-ES") : "";
+                        })() : ""}
+                        placeholder="dd/mm/yyyy"
+                        className={`bg-background pr-10 ${
+                          hrFormErrors.some((e) => e.includes("contratación"))
+                            ? "border-red-500"
+                            : ""
+                        }`}
+                        onChange={(e) => {
+                          const inputValue = e.target.value;
+                          // Parse DD/MM/YYYY format
+                          const match = inputValue.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                          if (match) {
+                            const [, day, month, year] = match;
+                            const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                            if (!isNaN(date.getTime())) {
+                              const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                              setHrForm((prev) => ({
+                                ...prev,
+                                hire_date: formattedDate,
+                              }));
+                            }
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "ArrowDown") {
+                            e.preventDefault();
+                            setShowHireDatePicker(true);
+                          }
+                        }}
+                      />
+                      <Popover open={showHireDatePicker} onOpenChange={setShowHireDatePicker}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            className="absolute top-1/2 right-2 size-6 -translate-y-1/2"
+                          >
+                            <CalendarDays className="size-3.5" />
+                            <span className="sr-only">Seleccionar fecha de contratación</span>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          className="w-auto overflow-hidden p-0"
+                          align="end"
+                          alignOffset={-8}
+                          sideOffset={10}
+                        >
+                          <Calendar
+                            mode="single"
+                            selected={hrForm.hire_date ? new Date(hrForm.hire_date) : undefined}
+                            captionLayout="dropdown"
+                            onSelect={(date) => {
+                              if (date) {
+                                const year = date.getFullYear();
+                                const month = String(date.getMonth() + 1).padStart(2, '0');
+                                const day = String(date.getDate()).padStart(2, '0');
+                                setHrForm((prev) => ({
+                                  ...prev,
+                                  hire_date: `${year}-${month}-${day}`,
+                                }));
+                              }
+                              setShowHireDatePicker(false);
+                            }}
+                            formatters={{
+                              formatMonthDropdown: (date: Date) =>
+                                date.toLocaleString("es", { month: "long" }),
+                              formatCaption: (date: Date) =>
+                                date.toLocaleString("es", { month: "long", year: "numeric" }),
+                              formatWeekdayName: (date: Date) =>
+                                date.toLocaleString("es", { weekday: "short" }),
+                            }}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1390,13 +1532,16 @@ export default function EmployeesPage() {
                     <Input
                       type="number"
                       min="1"
-                      value={hrForm.weekly_hours}
-                      onChange={(e) =>
+                      value={hrForm.weekly_hours || ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Remove leading zeros but allow single zero
+                        const cleanValue = value.replace(/^0+/, '') || '0';
                         setHrForm((prev) => ({
                           ...prev,
-                          weekly_hours: parseInt(e.target.value) || 0,
-                        }))
-                      }
+                          weekly_hours: parseInt(cleanValue) || 0,
+                        }));
+                      }}
                       placeholder="40"
                       className={
                         hrFormErrors.some((e) => e.includes("semanales"))
@@ -1413,13 +1558,16 @@ export default function EmployeesPage() {
                     <Input
                       type="number"
                       min="1"
-                      value={hrForm.weekly_objective_days}
-                      onChange={(e) =>
+                      value={hrForm.weekly_objective_days || ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Remove leading zeros but allow single zero
+                        const cleanValue = value.replace(/^0+/, '') || '0';
                         setHrForm((prev) => ({
                           ...prev,
-                          weekly_objective_days: parseInt(e.target.value) || 0,
-                        }))
-                      }
+                          weekly_objective_days: parseInt(cleanValue) || 0,
+                        }));
+                      }}
                       placeholder="5"
                       className={
                         hrFormErrors.some((e) =>
@@ -1438,13 +1586,16 @@ export default function EmployeesPage() {
                     <Input
                       type="number"
                       min="1"
-                      value={hrForm.monthly_objective_days}
-                      onChange={(e) =>
+                      value={hrForm.monthly_objective_days || ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Remove leading zeros but allow single zero
+                        const cleanValue = value.replace(/^0+/, '') || '0';
                         setHrForm((prev) => ({
                           ...prev,
-                          monthly_objective_days: parseInt(e.target.value) || 0,
-                        }))
-                      }
+                          monthly_objective_days: parseInt(cleanValue) || 0,
+                        }));
+                      }}
                       placeholder="22"
                       className={
                         hrFormErrors.some((e) =>
@@ -1520,7 +1671,7 @@ export default function EmployeesPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Piso</Label>
+                    <Label>Piso y Departamento</Label>
                     <Input
                       value={hrForm.location.piso}
                       onChange={(e) =>
@@ -1529,7 +1680,7 @@ export default function EmployeesPage() {
                           location: { ...prev.location, piso: e.target.value },
                         }))
                       }
-                      placeholder="3"
+                      placeholder="Ej: Piso 3, Dpto A o 3A"
                     />
                   </div>
                   <div className="space-y-2">
@@ -1547,7 +1698,7 @@ export default function EmployeesPage() {
                           },
                         }))
                       }
-                      placeholder="Buenos Aires"
+                      placeholder="CABA"
                       className={
                         hrFormErrors.some((e) => e.includes("Ciudad"))
                           ? "border-red-500"
@@ -1918,13 +2069,16 @@ export default function EmployeesPage() {
                     <Input
                       type="number"
                       min="0"
-                      value={editForm.weekly_hours}
-                      onChange={(e) =>
+                      value={editForm.weekly_hours || ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Remove leading zeros but allow single zero
+                        const cleanValue = value.replace(/^0+/, '') || '0';
                         setEditForm((prev) => ({
                           ...prev,
-                          weekly_hours: parseInt(e.target.value) || 0,
-                        }))
-                      }
+                          weekly_hours: parseInt(cleanValue) || 0,
+                        }));
+                      }}
                       placeholder="40"
                     />
                   </div>
@@ -1933,13 +2087,16 @@ export default function EmployeesPage() {
                     <Input
                       type="number"
                       min="0"
-                      value={editForm.weekly_objective_days}
-                      onChange={(e) =>
+                      value={editForm.weekly_objective_days || ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Remove leading zeros but allow single zero
+                        const cleanValue = value.replace(/^0+/, '') || '0';
                         setEditForm((prev) => ({
                           ...prev,
-                          weekly_objective_days: parseInt(e.target.value) || 0,
-                        }))
-                      }
+                          weekly_objective_days: parseInt(cleanValue) || 0,
+                        }));
+                      }}
                       placeholder="5"
                     />
                   </div>
@@ -1948,13 +2105,16 @@ export default function EmployeesPage() {
                     <Input
                       type="number"
                       min="0"
-                      value={editForm.monthly_objective_days}
-                      onChange={(e) =>
+                      value={editForm.monthly_objective_days || ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Remove leading zeros but allow single zero
+                        const cleanValue = value.replace(/^0+/, '') || '0';
                         setEditForm((prev) => ({
                           ...prev,
-                          monthly_objective_days: parseInt(e.target.value) || 0,
-                        }))
-                      }
+                          monthly_objective_days: parseInt(cleanValue) || 0,
+                        }));
+                      }}
                       placeholder="22"
                     />
                   </div>
@@ -2010,90 +2170,7 @@ export default function EmployeesPage() {
                 </div>
               </div>
 
-              {/* Horarios y Notificaciones */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">
-                  Horarios y Notificaciones
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Hora de Entrada</Label>
-                    <Input
-                      type="time"
-                      value={editForm.checkin_start_time}
-                      onChange={(e) =>
-                        setEditForm((prev) => ({
-                          ...prev,
-                          checkin_start_time: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Hora de Salida</Label>
-                    <Input
-                      type="time"
-                      value={editForm.checkout_end_time}
-                      onChange={(e) =>
-                        setEditForm((prev) => ({
-                          ...prev,
-                          checkout_end_time: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Zona Horaria</Label>
-                    <Select
-                      value={editForm.timezone}
-                      onValueChange={(value) =>
-                        setEditForm((prev) => ({ ...prev, timezone: value }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar zona horaria" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="America/Argentina/Buenos_Aires">
-                          🇦🇷 Buenos Aires (GMT-3)
-                        </SelectItem>
-                        <SelectItem value="America/Argentina/Cordoba">
-                          🇦🇷 Córdoba (GMT-3)
-                        </SelectItem>
-                        <SelectItem value="America/Argentina/Mendoza">
-                          🇦🇷 Mendoza (GMT-3)
-                        </SelectItem>
-                        <SelectItem value="America/Santiago">
-                          🇨🇱 Santiago (GMT-3)
-                        </SelectItem>
-                        <SelectItem value="America/Montevideo">
-                          🇺🇾 Montevideo (GMT-3)
-                        </SelectItem>
-                        <SelectItem value="America/Sao_Paulo">
-                          🇧🇷 São Paulo (GMT-3)
-                        </SelectItem>
-                        <SelectItem value="UTC">🌍 UTC (GMT+0)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Minutos de Notificación</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={editForm.notification_offset_min}
-                      onChange={(e) =>
-                        setEditForm((prev) => ({
-                          ...prev,
-                          notification_offset_min:
-                            parseInt(e.target.value) || 0,
-                        }))
-                      }
-                      placeholder="10"
-                    />
-                  </div>
-                </div>
-              </div>
+
 
               {/* Notas */}
               <div className="space-y-2">
@@ -2164,11 +2241,12 @@ export default function EmployeesPage() {
                       checkin_start_time: e.target.value,
                     }))
                   }
-                  className={
+                  step="60"
+                  className={`bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none ${
                     checkinFormErrors.some((e) => e.includes("entrada"))
                       ? "border-red-500"
                       : ""
-                  }
+                  }`}
                 />
               </div>
               <div className="space-y-2">
@@ -2184,11 +2262,12 @@ export default function EmployeesPage() {
                       checkout_end_time: e.target.value,
                     }))
                   }
-                  className={
+                  step="60"
+                  className={`bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none ${
                     checkinFormErrors.some((e) => e.includes("salida"))
                       ? "border-red-500"
                       : ""
-                  }
+                  }`}
                 />
               </div>
               <div className="space-y-2">

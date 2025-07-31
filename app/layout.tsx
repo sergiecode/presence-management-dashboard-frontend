@@ -3,6 +3,7 @@ import "../app/globals.css";
 import { Montserrat, Mukta } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { UserProvider } from "./contexts/UserContext";
+import { Toaster } from "@/components/ui/sonner";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -40,6 +41,14 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             {children}
+            <Toaster 
+              toastOptions={{
+                classNames: {
+                  success: "bg-orange-500 border-orange-600 text-white",
+                  error: "bg-red-500 border-red-600 text-white",
+                },
+              }}
+            />
           </ThemeProvider>
         </UserProvider>
       </body>

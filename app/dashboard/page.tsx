@@ -9,12 +9,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Users,
   TrendingUp,
   Calendar,
   Clock,
-  Building2,
+  Building2, 
   UserCheck,
   Shield,
   BarChart3,
@@ -69,7 +70,7 @@ interface AttendanceStats {
 }
 
 export default function Dashboard() {
-  const { user } = useUser();
+  const { user, loading: userLoading } = useUser();
 
   // Estados principales
   const [usersStats, setUsersStats] = useState<UsersStats | null>(null);
@@ -169,6 +170,20 @@ export default function Dashboard() {
           (attendanceStats.on_time / attendanceStats.total_checkins) * 100
         )
       : 0;
+
+  if (userLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="flex flex-col items-center space-y-4">
+          <Skeleton className="h-8 w-8 rounded-full" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-[200px]" />
+            <Skeleton className="h-4 w-[150px]" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
