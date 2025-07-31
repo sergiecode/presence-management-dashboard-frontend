@@ -1465,7 +1465,7 @@ export default function AttendancePage() {
       </div>
 
       {/* Resumen diario - Compact cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="p-3">
           <div className="flex items-center justify-between">
             <div>
@@ -1532,37 +1532,19 @@ export default function AttendancePage() {
         <Card className="p-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium text-muted-foreground">Tiempo Extra</p>
+              <p className="text-xs font-medium text-muted-foreground">Finalizados</p>
               {loading ? (
                 <Skeleton className="h-6 w-8 mb-1" />
               ) : (
-                <p className="text-lg font-bold text-blue-600">0</p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                registros con sobretiem
-              </p>
-            </div>
-            <Clock className="h-4 w-4 text-blue-600" />
-          </div>
-        </Card>
-
-        <Card className="p-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Productividad</p>
-              {loading ? (
-                <Skeleton className="h-6 w-12 mb-1" />
-              ) : (
-                <p className="text-lg font-bold text-purple-600">
-                  {liveStats && liveStats.total_employees > 0
-                    ? Math.round((liveStats.present_today / liveStats.total_employees) * 100)
-                    : 0}
-                  %
+                <p className="text-lg font-bold text-gray-600">
+                  {checkins.filter(checkin => checkin.checkout_time !== null).length}
                 </p>
               )}
-              <p className="text-xs text-muted-foreground">índice general</p>
+              <p className="text-xs text-muted-foreground">
+                registros completados
+              </p>
             </div>
-            <CalendarDays className="h-4 w-4 text-purple-600" />
+            <Clock className="h-4 w-4 text-gray-600" />
           </div>
         </Card>
       </div>

@@ -164,13 +164,6 @@ export default function Dashboard() {
     (item) => new Date(item.month).getMonth() === new Date().getMonth()
   );
 
-  const productivityRate =
-    attendanceStats && attendanceStats.total_checkins > 0
-      ? Math.round(
-          (attendanceStats.on_time / attendanceStats.total_checkins) * 100
-        )
-      : 0;
-
   if (userLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -232,147 +225,114 @@ export default function Dashboard() {
       )}
 
       {/* Métricas principales de usuarios */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Usuarios
-            </CardTitle>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+        <Card className="p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Total Usuarios</p>
+              <div className="text-lg font-bold text-blue-600">
+                {loading ? "..." : usersStats?.total_users || 0}
+              </div>
+              <p className="text-xs text-muted-foreground">registrados</p>
+            </div>
             <Users className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              {loading ? "..." : usersStats?.total_users || 0}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              usuarios registrados
-            </p>
-          </CardContent>
+          </div>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Administradores
-            </CardTitle>
+        <Card className="p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Administradores</p>
+              <div className="text-lg font-bold text-purple-600">
+                {loading ? "..." : usersStats?.admin || 0}
+              </div>
+              <p className="text-xs text-muted-foreground">con privilegios</p>
+            </div>
             <Shield className="h-4 w-4 text-purple-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-600">
-              {loading ? "..." : usersStats?.admin || 0}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              con privilegios admin
-            </p>
-          </CardContent>
+          </div>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Empleados</CardTitle>
+        <Card className="p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Empleados</p>
+              <div className="text-lg font-bold text-green-600">
+                {loading ? "..." : usersStats?.employees || 0}
+              </div>
+              <p className="text-xs text-muted-foreground">activos</p>
+            </div>
             <UserCheck className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {loading ? "..." : usersStats?.employees || 0}
-            </div>
-            <p className="text-xs text-muted-foreground">empleados activos</p>
-          </CardContent>
+          </div>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Recursos Humanos
-            </CardTitle>
-            <Building2 className="h-4 w-4 text-orange-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
-              {loading ? "..." : usersStats?.hr || 0}
+        <Card className="p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Recursos Humanos</p>
+              <div className="text-lg font-bold text-orange-600">
+                {loading ? "..." : usersStats?.hr || 0}
+              </div>
+              <p className="text-xs text-muted-foreground">personal RRHH</p>
             </div>
-            <p className="text-xs text-muted-foreground">personal de RRHH</p>
-          </CardContent>
+            <Building2 className="h-4 w-4 text-orange-600" />
+          </div>
+        </Card>
+
+        <Card className="p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Pendientes</p>
+              <div className="text-lg font-bold text-orange-600">
+                {loading ? "..." : pendingUsers.length}
+              </div>
+              <p className="text-xs text-muted-foreground">por aprobar</p>
+            </div>
+            <UserCheck className="h-4 w-4 text-orange-600" />
+          </div>
         </Card>
       </div>
 
       {/* Métricas de rendimiento */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Check-ins (30 días)
-            </CardTitle>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <Card className="p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Check-ins (30 días)</p>
+              <div className="text-lg font-bold text-blue-600">
+                {loading ? "..." : attendanceStats?.total_checkins || 0}
+              </div>
+              <p className="text-xs text-muted-foreground">registros totales</p>
+            </div>
             <Calendar className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              {loading ? "..." : attendanceStats?.total_checkins || 0}
-            </div>
-            <p className="text-xs text-muted-foreground">registros totales</p>
-          </CardContent>
+          </div>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Productividad</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {loading ? "..." : productivityRate}%
+        <Card className="p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Tardanzas (30 días)</p>
+              <div className="text-lg font-bold text-yellow-600">
+                {loading ? "..." : attendanceStats?.late || 0}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {attendanceStats?.late_pct || 0}% del total
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              índice de puntualidad
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Tardanzas (30 días)
-            </CardTitle>
             <Clock className="h-4 w-4 text-yellow-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">
-              {loading ? "..." : attendanceStats?.late || 0}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {attendanceStats?.late_pct || 0}% del total
-            </p>
-          </CardContent>
+          </div>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Pendientes Aprobación
-            </CardTitle>
-            <UserCheck className="h-4 w-4 text-orange-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
-              {loading ? "..." : pendingUsers.length}
+        <Card className="p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Check-ins Hoy</p>
+              <div className="text-lg font-bold text-indigo-600">
+                {loading ? "..." : todayCheckins}
+              </div>
+              <p className="text-xs text-muted-foreground">registros de hoy</p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              usuarios por aprobar
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Check-ins Hoy</CardTitle>
             <Calendar className="h-4 w-4 text-indigo-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-indigo-600">
-              {loading ? "..." : todayCheckins}
-            </div>
-            <p className="text-xs text-muted-foreground">registros de hoy</p>
-          </CardContent>
+          </div>
         </Card>
       </div>
 
