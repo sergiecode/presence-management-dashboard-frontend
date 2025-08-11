@@ -55,6 +55,11 @@
   height: 500px;
 }
 
+.box.expanded {
+  width: 450px;
+  height: 500px;
+}
+
 @keyframes rotating {
   0% {
     --a: 0deg;
@@ -102,7 +107,8 @@
   overflow: hidden;
 }
 
-.box:hover .login {
+.box:hover .login,
+.box.expanded .login {
   inset: 40px;
 }
 
@@ -159,6 +165,7 @@
   border: 1px solid #f58000;
 }
 
-.box:hover .loginBx {
+.box:hover .loginBx,
+.box.expanded .loginBx {
   transform: translateY(0px);
 }

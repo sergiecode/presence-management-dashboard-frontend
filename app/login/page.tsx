@@ -9,6 +9,7 @@ import Spinner from '@/components/ui/spinner';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isExpanded, setIsExpanded] = useState(false);
   const { loading, login, error } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -22,13 +23,20 @@ export default function LoginPage() {
     }
   }
 
+  const handleMouseEnter = () => {
+    setIsExpanded(true);
+  };
+
   return (
     <div className={styles['page-wrapper']}>
       <div className={styles['bg-login']}>
         <img className={styles.imgBg} src="/fondo2.jpg" alt="Fondo de login" />
       </div>
       <div className={styles['container-login']}>
-        <div className={styles.box}>
+        <div 
+          className={`${styles.box} ${isExpanded ? styles.expanded : ''}`}
+          onMouseEnter={handleMouseEnter}
+        >
           <div className={styles.login}>
             <form className={styles.loginBx} onSubmit={handleSubmit}>
               <img src="/logo.png" className={styles.imgLogo} alt="Logo" />

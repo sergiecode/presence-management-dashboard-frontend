@@ -134,8 +134,12 @@ export function useAuth() {
       try {
         const storedUser = localStorage.getItem("user");
         const accessToken = localStorage.getItem("accessToken");
+        const cookieToken = Cookies.get("token");
 
-        if (storedUser && accessToken) {
+        // Verificar si hay token en cookies o localStorage
+        const hasValidToken = accessToken || cookieToken;
+
+        if (storedUser && hasValidToken) {
           const userData = JSON.parse(storedUser);
           const userRole = userData.user?.role || userData.role;
 
@@ -143,38 +147,95 @@ export function useAuth() {
             if (isMounted) {
               setUser(userData);
             }
+            
+            // Si no hay accessToken en localStorage pero sí en cookies, sincronizar
+            if (!accessToken && cookieToken) {
+              localStorage.setItem("accessToken", cookieToken);
+            }
+            
             // Obtener datos actualizados del usuario
             try {
-              const currentUserData = await getCurrentUser(accessToken);
-              if (isMounted) {
-                setCurrentUserData(currentUserData);
+              const tokenToUse = accessToken || cookieToken;
+              if (tokenToUse) {
+                const currentUserData = await getCurrentUser(tokenToUse);
+                if (isMounted) {
+                  setCurrentUserData(currentUserData);
+                }
               }
             } catch (userError) {
               console.warn(
                 "No se pudieron obtener los datos actualizados del usuario:",
                 userError
               );
+              // Si falla la validación del token, limpiar todo
+              if (isMounted) {
+                clearAuthData();
+                window.location.href = "/login";
+                return;
+              }
             }
           } else {
             // Limpiar datos directamente
-            localStorage.removeItem("user");
-            localStorage.removeItem("accessToken");
-            localStorage.removeItem("refreshToken");
-            Cookies.remove("token");
+            clearAuthData();
             if (isMounted) {
-              setUser(null);
-              setCurrentUserData(null);
+              window.location.href = "/login";
             }
-            // Usar window.location en lugar de router para evitar dependencias
-            window.location.href = "/login";
+          }
+        } else if (hasValidToken && !storedUser) {
+          // Hay token pero no datos de usuario, intentar obtener usuario
+          try {
+            const tokenToUse = accessToken || cookieToken;
+            if (tokenToUse) {
+              const currentUserData = await getCurrentUser(tokenToUse);
+              
+              // Crear objeto de usuario básico compatible con LoginResponse
+              const basicUserData: LoginResponse = {
+                user: currentUserData,
+                token: tokenToUse,
+                access_token: tokenToUse,
+                refresh_token: "",
+                token_type: "Bearer",
+                expires_in: 3600,
+                email: currentUserData.email,
+                role: currentUserData.role,
+                name: currentUserData.name,
+                id: currentUserData.id,
+                picture: currentUserData.picture || ""
+              };
+              
+              if (["admin", "hr"].includes(currentUserData.role)) {
+                localStorage.setItem("user", JSON.stringify(basicUserData));
+                if (!accessToken && cookieToken) {
+                  localStorage.setItem("accessToken", cookieToken);
+                }
+                
+                if (isMounted) {
+                  setUser(basicUserData);
+                  setCurrentUserData(currentUserData);
+                }
+              } else {
+                clearAuthData();
+                if (isMounted) {
+                  window.location.href = "/login";
+                }
+              }
+            }
+          } catch (error) {
+            console.error("Error validating token:", error);
+            clearAuthData();
+            if (isMounted) {
+              window.location.href = "/login";
+            }
           }
         } else {
+          // No hay datos válidos
           if (isMounted) {
             setUser(null);
           }
         }
       } catch (error) {
         console.error("Error parsing user data:", error);
+        clearAuthData();
         if (isMounted) {
           setUser(null);
         }
@@ -190,7 +251,7 @@ export function useAuth() {
     return () => {
       isMounted = false;
     };
-  }, []); // Sin dependencias para evitar bucles
+  }, [clearAuthData]); // Incluir clearAuthData para satisfacer las dependencias
 
   const getToken = useCallback(() => {
     const accessToken = localStorage.getItem("accessToken");

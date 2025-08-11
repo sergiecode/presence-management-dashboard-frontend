@@ -34,12 +34,32 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           setUser(userData);
         } else {
           console.error("❌ User role not authorized:", userRole);
+          // Limpiar datos si el rol no es válido
+          localStorage.removeItem("user");
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("refreshToken");
         }
       } else {
-        console.error("❌ No stored user or token found");
+        // Verificar si hay token en cookies pero no en localStorage
+        const cookieToken = document.cookie
+          .split('; ')
+          .find(row => row.startsWith('token='))
+          ?.split('=')[1];
+          
+        if (cookieToken && !storedUser) {
+          // Sincronizar token de cookies a localStorage
+          localStorage.setItem("accessToken", cookieToken);
+          console.log("🔄 Token synchronized from cookies to localStorage");
+        } else {
+          console.log("ℹ️ No stored user or token found");
+        }
       }
     } catch (error) {
       console.error("Error loading user data:", error);
+      // Limpiar datos corruptos
+      localStorage.removeItem("user");
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
     } finally {
       setLoading(false);
     }

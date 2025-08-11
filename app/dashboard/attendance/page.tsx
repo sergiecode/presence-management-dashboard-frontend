@@ -103,6 +103,7 @@ interface CheckinRecord {
     checkin_id: number;
     location_type: number;
     location_detail: string;
+    start_time?: string;
     created_at: string;
   }>;
   notes: string;
@@ -125,6 +126,8 @@ interface User {
   role: string;
   active: boolean;
   pending_approval: boolean;
+  checkin_start_time?: string;
+  timezone?: string;
   location?: {
     calle?: string;
     ciudad?: string;
@@ -141,6 +144,7 @@ interface CreateCheckinData {
   locations: Array<{
     location_type: number;
     location_detail: string;
+    start_time?: string;
   }>;
   late_reason?: string;
   notes?: string;
@@ -152,6 +156,7 @@ interface EditCheckinData {
   locations?: Array<{
     location_type: number;
     location_detail: string;
+    start_time?: string;
   }>;
   late_reason?: string;
   notes?: string;
@@ -194,21 +199,6 @@ export default function AttendancePage() {
   }, [user]);
 
   // Helper function to check if a time is late (after 8:00 AM)
-  const isTimeLate = (timeStr: string): boolean => {
-    if (!timeStr) return false;
-    try {
-      const date = new Date(timeStr);
-      const hours = date.getHours();
-      const minutes = date.getMinutes();
-      const totalMinutes = hours * 60 + minutes;
-      const lateThreshold = 8 * 60; // 8:00 AM in minutes
-      return totalMinutes > lateThreshold;
-    } catch (error) {
-      console.error("Error checking if time is late:", error);
-      return false;
-    }
-  };
-
   // Utility function to format time for backend with timezone info
   const formatTimeForBackend = (timeStr: string) => {
     if (!timeStr) return timeStr;
@@ -236,6 +226,49 @@ export default function AttendancePage() {
   const [liveStats, setLiveStats] = useState<LiveStats | null>(null);
   const [allUsers, setAllUsers] = useState<User[]>([]);
 
+  // Function to check if a time is considered late for a specific user
+  const isTimeLate = useCallback((timeStr: string, userId?: number): boolean => {
+    if (!timeStr) return false;
+    
+    try {
+      // Find the selected user
+      const selectedUser = userId ? allUsers.find(user => user.id === userId) : null;
+      
+      // Get user's check-in start time (default to 8:00 if not set)
+      const userStartTime = selectedUser?.checkin_start_time || "08:00";
+      
+      // Get user's timezone (default to Argentina timezone if not set)
+      const userTimezone = selectedUser?.timezone || "America/Argentina/Buenos_Aires";
+      
+      // Parse the input time string
+      const inputDate = new Date(timeStr);
+      
+      // Convert to user's timezone for comparison
+      const userLocalTime = new Intl.DateTimeFormat('en-CA', {
+        timeZone: userTimezone,
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(inputDate);
+      
+      // Parse start time (format: "HH:MM")
+      const [startHour, startMinute] = userStartTime.split(':').map(Number);
+      const startTimeInMinutes = startHour * 60 + startMinute;
+      
+      // Parse input time
+      const [inputHour, inputMinute] = userLocalTime.split(':').map(Number);
+      const inputTimeInMinutes = inputHour * 60 + inputMinute;
+      
+      // Consider late if more than 15 minutes after start time
+      const lateThreshold = startTimeInMinutes + 15;
+      
+      return inputTimeInMinutes > lateThreshold;
+    } catch (error) {
+      console.error("Error checking if time is late:", error);
+      return false;
+    }
+  }, [allUsers]);
+
   // Estados de filtrado y paginación
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [mounted, setMounted] = useState(false);
@@ -257,6 +290,9 @@ export default function AttendancePage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showLocationsModal, setShowLocationsModal] = useState(false);
+  const [selectedLocations, setSelectedLocations] = useState<{location_type: number, location_detail: string, start_time?: string}[]>([]);
+  const [selectedUserInfo, setSelectedUserInfo] = useState<{name: string, email: string} | null>(null);
   const [editingCheckin, setEditingCheckin] = useState<CheckinRecord | null>(
     null
   );
@@ -277,7 +313,7 @@ export default function AttendancePage() {
 
   // Estados de formularios
   const [createForm, setCreateForm] = useState<CreateCheckinData>({
-    locations: [{ location_type: 1, location_detail: "" }],
+    locations: [{ location_type: 1, location_detail: "", start_time: "" }],
     late_reason: "",
     notes: "",
     time: "",
@@ -533,8 +569,9 @@ export default function AttendancePage() {
         ? checkin.locations.map(loc => ({
             location_type: loc.location_type,
             location_detail: loc.location_detail,
+            start_time: loc.start_time || "",
           }))
-        : [{ location_type: 1, location_detail: "" }];
+        : [{ location_type: 1, location_detail: "", start_time: "" }];
       
       setEditForm({
         notes: checkin.notes,
@@ -563,8 +600,9 @@ export default function AttendancePage() {
         ? checkin.locations.map(loc => ({
             location_type: loc.location_type,
             location_detail: loc.location_detail,
+            start_time: loc.start_time || "",
           }))
-        : [{ location_type: 1, location_detail: "" }];
+        : [{ location_type: 1, location_detail: "", start_time: "" }];
       
       setEditForm({
         notes: checkin.notes,
@@ -591,7 +629,7 @@ export default function AttendancePage() {
     }
 
     // Validate late_reason for late check-ins
-    if (isTimeLate(createForm.time) && (!createForm.late_reason || createForm.late_reason.trim() === "")) {
+    if (isTimeLate(createForm.time, createForm.user_id) && (!createForm.late_reason || createForm.late_reason.trim() === "")) {
       toast.error("El motivo de tardanza es obligatorio para check-ins tardíos (después de las 8:00 AM)");
       return;
     }
@@ -620,7 +658,7 @@ export default function AttendancePage() {
       await createCheckinForUser(formattedCreateForm);
       setShowCreateModal(false);
       setCreateForm({
-        locations: [{ location_type: 1, location_detail: "" }],
+        locations: [{ location_type: 1, location_detail: "", start_time: "" }],
         late_reason: "",
         notes: "",
         time: "",
@@ -876,7 +914,7 @@ export default function AttendancePage() {
           return (
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">
+                <span className="text-sm font-medium text-foreground">
                   {locations.length} ubicación{locations.length > 1 ? 'es' : ''}
                 </span>
                 <Badge variant="secondary" className="text-xs">
@@ -885,27 +923,37 @@ export default function AttendancePage() {
               </div>
               
               {/* Show latest location as preview */}
-              <div className="flex items-center gap-2 p-1 bg-gray-50 rounded">
+              <div className="flex items-center gap-2 p-1 bg-muted/50 dark:bg-muted/30 rounded">
                 <span className="text-sm">
                   {getLocationInfo(locations[locations.length - 1].location_type).icon}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium text-gray-700">
+                  <div className="text-xs font-medium text-foreground">
                     {getLocationInfo(locations[locations.length - 1].location_type).label}
                   </div>
                   {locations[locations.length - 1].location_detail && (
-                    <div className="text-xs text-gray-600 truncate" title={locations[locations.length - 1].location_detail}>
+                    <div className="text-xs text-muted-foreground truncate" title={locations[locations.length - 1].location_detail}>
                       {locations[locations.length - 1].location_detail}
                     </div>
                   )}
                 </div>
               </div>
               
-              {/* Show additional locations count if more than 1 */}
+              {/* Show additional locations count if more than 1 - clickeable */}
               {locations.length > 1 && (
-                <div className="text-xs text-blue-600 font-medium">
+                <button
+                  onClick={() => {
+                    setSelectedLocations(locations);
+                    setSelectedUserInfo({
+                      name: info.row.original.name,
+                      email: info.row.original.email
+                    });
+                    setShowLocationsModal(true);
+                  }}
+                  className="text-xs text-primary font-medium hover:text-primary/80 transition-colors cursor-pointer underline decoration-dotted"
+                >
                   +{locations.length - 1} ubicación{locations.length > 2 ? 'es' : ''} más
-                </div>
+                </button>
               )}
             </div>
           );
@@ -976,7 +1024,7 @@ export default function AttendancePage() {
         ),
       }),
     ],
-    [columnHelper, handleEditCheckin, formatTimeInUserTimezone]
+    [columnHelper, handleEditCheckin, formatTimeInUserTimezone, locationTypes, user?.user?.timezone]
   );
 
   const filteredData = useMemo(() => {
@@ -1149,7 +1197,7 @@ export default function AttendancePage() {
               if (!open) {
                 // Reset form when modal is closed
                 setCreateForm({
-                  locations: [{ location_type: 1, location_detail: "" }],
+                  locations: [{ location_type: 1, location_detail: "", start_time: "" }],
                   late_reason: "",
                   notes: "",
                   time: "",
@@ -1165,7 +1213,7 @@ export default function AttendancePage() {
                   Nuevo Check-in
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
+              <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
                 <div>
                 <DialogHeader>
                   <DialogTitle>Crear Check-in</DialogTitle>
@@ -1232,8 +1280,52 @@ export default function AttendancePage() {
 
                     </div>
                     {createForm.user_id > 0 && (
-                      <div className="text-sm text-muted-foreground mt-1">
-                        Usuario seleccionado: {allUsers.find(u => u.id === createForm.user_id)?.name}
+                      <div className="text-sm mt-1 p-3 bg-muted/30 dark:bg-muted/20 rounded-md border border-border">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-xs font-semibold text-primary">
+                              {allUsers.find(u => u.id === createForm.user_id)?.name?.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-foreground">Usuario seleccionado:</span>
+                            <span className="ml-1 text-foreground">{allUsers.find(u => u.id === createForm.user_id)?.name}</span>
+                          </div>
+                        </div>
+                        {(() => {
+                          const selectedUser = allUsers.find(u => u.id === createForm.user_id);
+                          if (selectedUser) {
+                            const startTime = selectedUser.checkin_start_time || "08:00";
+                            const timezone = selectedUser.timezone || "America/Argentina/Buenos_Aires";
+                            return (
+                              <div className="space-y-2">
+                                <div className="text-sm text-muted-foreground">
+                                  <span className="font-medium">Horario de entrada:</span> 
+                                  <span className="ml-1 font-mono">{startTime}</span>
+                                  <span className="ml-1 text-xs">({timezone})</span>
+                                </div>
+                                {/* Solo mostrar el estado si hay fecha y hora seleccionada */}
+                                {createForm.time && createForm.time.trim() !== "" && (
+                                  <div className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${
+                                    isTimeLate(createForm.time, createForm.user_id)
+                                      ? "bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50" 
+                                      : "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/50"
+                                  }`}>
+                                    <span>
+                                      {isTimeLate(createForm.time, createForm.user_id) ? "⚠️" : "✅"}
+                                    </span>
+                                    <span>
+                                      {isTimeLate(createForm.time, createForm.user_id)
+                                        ? "Este check-in se considera tarde (más de 15 min después del horario)" 
+                                        : "Este check-in está a tiempo"}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
                     )}
                   </div>
@@ -1379,6 +1471,7 @@ export default function AttendancePage() {
                                       ? {
                                           location_type: locationType,
                                           location_detail: autoLocationDetail || loc.location_detail || "",
+                                          start_time: loc.start_time || "",
                                         }
                                       : loc
                                   ) || [],
@@ -1430,6 +1523,7 @@ export default function AttendancePage() {
                                       ? {
                                           location_type: loc.location_type,
                                           location_detail: e.target.value,
+                                          start_time: loc.start_time || "",
                                         }
                                       : loc
                                   ) || [],
@@ -1450,6 +1544,32 @@ export default function AttendancePage() {
                               </p>
                             )}
                           </div>
+                          
+                          <div className="space-y-2">
+                            <Label className="text-sm">Hora de Inicio en esta Ubicación (Opcional)</Label>
+                            <Input
+                              type="time"
+                              placeholder="HH:MM"
+                              value={location.start_time || ""}
+                              onChange={(e) =>
+                                setCreateForm((prev) => ({
+                                  ...prev,
+                                  locations: prev.locations?.map((loc, i) => 
+                                    i === index 
+                                      ? {
+                                          location_type: loc.location_type,
+                                          location_detail: loc.location_detail,
+                                          start_time: e.target.value,
+                                        }
+                                      : loc
+                                  ) || [],
+                                }))
+                              }
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Especifica cuándo comenzaste a trabajar desde esta ubicación
+                            </p>
+                          </div>
                         </div>
                       ))}
                       
@@ -1465,6 +1585,7 @@ export default function AttendancePage() {
                               {
                                 location_type: 1,
                                 location_detail: "",
+                                start_time: "",
                               },
                             ],
                           }));
@@ -1476,7 +1597,7 @@ export default function AttendancePage() {
                       </Button>
                     </div>
                   </div>
-                  {isTimeLate(createForm.time) && (
+                  {isTimeLate(createForm.time, createForm.user_id) && (
                     <div className="space-y-2">
                       <Label className="flex items-center gap-2">
                         Motivo de Tardanza <span className="text-red-500">*</span>
@@ -1497,7 +1618,7 @@ export default function AttendancePage() {
                       </p>
                     </div>
                   )}
-                  {!isTimeLate(createForm.time) && createForm.late_reason && (
+                  {!isTimeLate(createForm.time, createForm.user_id) && createForm.late_reason && (
                     <div className="space-y-2">
                       <Label>Motivo de Tardanza</Label>
                       <Textarea
@@ -1855,7 +1976,7 @@ export default function AttendancePage() {
 
       {/* Modal de Exportación */}
       <Dialog open={showExportModal} onOpenChange={setShowExportModal}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Exportar Registros</DialogTitle>
             <DialogDescription>
@@ -1902,7 +2023,7 @@ export default function AttendancePage() {
 
       {/* Modal de Edición */}
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Check-in</DialogTitle>
             <DialogDescription>
@@ -1976,6 +2097,7 @@ export default function AttendancePage() {
                                 ? {
                                     location_type: locationType,
                                     location_detail: autoLocationDetail || loc.location_detail || "",
+                                    start_time: loc.start_time || "",
                                   }
                                 : loc
                             ) || [],
@@ -2027,6 +2149,7 @@ export default function AttendancePage() {
                                 ? {
                                     location_type: loc.location_type,
                                     location_detail: e.target.value,
+                                    start_time: loc.start_time || "",
                                   }
                                 : loc
                             ) || [],
@@ -2047,6 +2170,32 @@ export default function AttendancePage() {
                         </p>
                       )}
                     </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-sm">Hora de Inicio en esta Ubicación (Opcional)</Label>
+                      <Input
+                        type="time"
+                        placeholder="HH:MM"
+                        value={location.start_time || ""}
+                        onChange={(e) =>
+                          setEditForm((prev) => ({
+                            ...prev,
+                            locations: prev.locations?.map((loc, i) => 
+                              i === index 
+                                ? {
+                                    location_type: loc.location_type,
+                                    location_detail: loc.location_detail || "",
+                                    start_time: e.target.value,
+                                  }
+                                : loc
+                            ) || [],
+                          }))
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Especifica cuándo comenzaste a trabajar desde esta ubicación
+                      </p>
+                    </div>
                   </div>
                 ))}
                 
@@ -2062,6 +2211,7 @@ export default function AttendancePage() {
                         {
                           location_type: 1,
                           location_detail: "",
+                          start_time: "",
                         },
                       ],
                     }));
@@ -2107,6 +2257,91 @@ export default function AttendancePage() {
               </Button>
               <Button onClick={handleUpdateCheckin}>Actualizar</Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Ubicaciones */}
+      <Dialog open={showLocationsModal} onOpenChange={setShowLocationsModal}>
+        <DialogContent className="max-w-[90vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Todas las Ubicaciones</DialogTitle>
+            <DialogDescription>
+              Ubicaciones registradas para este check-in
+            </DialogDescription>
+            {selectedUserInfo && (
+              <div className="mt-2 p-2 bg-muted/30 rounded text-xs text-muted-foreground">
+                <span className="font-medium">{selectedUserInfo.name}</span> • {selectedUserInfo.email}
+              </div>
+            )}
+          </DialogHeader>
+          <div className="space-y-4">
+            {selectedLocations.map((location, index) => {
+              const getLocationInfo = (type: number) => {
+                // Use dynamic catalogs if available, fallback to hardcoded enums
+                if (locationTypes.length > 0) {
+                  const locationType = locationTypes.find(lt => lt.id === type);
+                  if (locationType) {
+                    return { icon: "📍", label: locationType.name };
+                  }
+                }
+                
+                // Fallback to hardcoded enums
+                switch (type) {
+                  case LOCATION_TYPES.REMOTE_DECLARED:
+                    return { icon: "🏠", label: LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_DECLARED] };
+                  case LOCATION_TYPES.REMOTE_ALTERNATIVE:
+                    return { icon: "🏠", label: LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_ALTERNATIVE] };
+                  case LOCATION_TYPES.CLIENT:
+                    return { icon: "🏭", label: LOCATION_TYPE_LABELS[LOCATION_TYPES.CLIENT] };
+                  case LOCATION_TYPES.OFFICE:
+                    return { icon: "🏢", label: LOCATION_TYPE_LABELS[LOCATION_TYPES.OFFICE] };
+                  default:
+                    return { icon: "❓", label: "Desconocido" };
+                }
+              };
+
+              const locationInfo = getLocationInfo(location.location_type);
+              
+              return (
+                <div key={index} className="border border-border rounded-lg p-4 space-y-3 bg-card">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{locationInfo.icon}</span>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-foreground">
+                        Ubicación {index + 1}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {locationInfo.label}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {location.location_detail && (
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-foreground">Dirección:</label>
+                      <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded">
+                        {location.location_detail}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {location.start_time && (
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-foreground">Hora de inicio:</label>
+                      <p className="text-sm text-muted-foreground font-mono">
+                        {location.start_time}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => setShowLocationsModal(false)}>
+              Cerrar
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

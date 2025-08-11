@@ -3,9 +3,9 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
-  const token =
-    request.cookies.get("token")?.value ||
-    request.headers.get("Authorization")?.split(" ")[1];
+  const cookieToken = request.cookies.get("token")?.value;
+  const authHeader = request.headers.get("Authorization")?.split(" ")[1];
+  const token = cookieToken || authHeader;
 
   const { pathname } = request.nextUrl;
 
@@ -23,13 +23,23 @@ export function middleware(request: NextRequest) {
   // Si no hay token y está intentando acceder a una ruta protegida
   if (!token && protectedRoutes.some((route) => pathname.startsWith(route))) {
     console.log(`🚫 Redirecting to /login from ${pathname} (no token)`);
-    return NextResponse.redirect(new URL("/login", request.url));
+    const response = NextResponse.redirect(new URL("/login", request.url));
+    // Limpiar cookies inválidas
+    response.cookies.delete("token");
+    return response;
   }
 
   // Si hay token y está intentando acceder a una ruta pública
   if (token && publicRoutes.includes(pathname)) {
     console.log(`🔄 Redirecting to /dashboard from ${pathname} (has token)`);
     return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  // Para rutas protegidas con token, añadir headers para mejorar caching
+  if (token && protectedRoutes.some((route) => pathname.startsWith(route))) {
+    const response = NextResponse.next();
+    response.headers.set("x-authenticated", "true");
+    return response;
   }
 
   return NextResponse.next();

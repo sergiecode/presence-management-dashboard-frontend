@@ -17,8 +17,13 @@ export default function AuthWrapper({
   const router = useRouter();
   
   useEffect(() => {
+    // Esperar un tiempo mínimo para evitar flashes
     if (!loading && !user) {
-      router.replace("/login");
+      const timer = setTimeout(() => {
+        router.replace("/login");
+      }, 100);
+      
+      return () => clearTimeout(timer);
     }
   }, [loading, user, router]);
 
@@ -49,9 +54,16 @@ export default function AuthWrapper({
     );
   }
 
-  // Only render children if user is authenticated
+  // Show authenticated message briefly while redirecting if not authenticated
   if (!user) {
-    return null; // This will trigger the redirect in useEffect
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Skeleton className="h-4 w-[250px] mx-auto mb-2" />
+          <Skeleton className="h-3 w-[180px] mx-auto" />
+        </div>
+      </div>
+    );
   }
 
   return (
