@@ -44,13 +44,11 @@ import {
   getUserById,
   downloadFile,
   generateExportFilename,
-  getLocationTypes,
-  getAbsenceTypes,
 } from "@/app/services/dashboard";
 import { useUser } from "@/app/contexts/UserContext";
 import { LOCATION_TYPE_LABELS, LOCATION_TYPES } from "@/app/constants/enums";
 import { toast } from "sonner";
-import { CatalogLocationType, CatalogAbsenceType } from "@/app/types/api";
+import { CatalogLocationType } from "@/app/types/api";
 import {
   Dialog,
   DialogContent,
@@ -253,9 +251,7 @@ export default function AttendancePage() {
   >("all");
 
   // Estados para catálogos dinámicos
-  const [locationTypes, setLocationTypes] = useState<CatalogLocationType[]>([]);
-  const [absenceTypes, setAbsenceTypes] = useState<CatalogAbsenceType[]>([]);
-  const [catalogsLoading, setCatalogsLoading] = useState(true);
+  const [locationTypes] = useState<CatalogLocationType[]>([]);
 
   // Estados de modales
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -533,19 +529,19 @@ export default function AttendancePage() {
       
       
       // Get location data from the locations array
-      const location = checkin.locations && checkin.locations.length > 0 ? checkin.locations[0] : null;
+      const locations = checkin.locations && checkin.locations.length > 0 
+        ? checkin.locations.map(loc => ({
+            location_type: loc.location_type,
+            location_detail: loc.location_detail,
+          }))
+        : [{ location_type: 1, location_detail: "" }];
       
       setEditForm({
         notes: checkin.notes,
         late_reason: checkin.late_reason,
         time: localDateTimeString,
         userTimezone: userTimezone,
-        locations: [
-          {
-            location_type: location?.location_type || 1,
-            location_detail: location?.location_detail || "",
-          },
-        ],
+        locations: locations,
       });
       setShowEditModal(true);
     } catch (error) {
@@ -563,19 +559,19 @@ export default function AttendancePage() {
       const minutes = String(localDate.getMinutes()).padStart(2, '0');
       const localDateTimeString = `${year}-${month}-${day}T${hours}:${minutes}`;
       
-      const location = checkin.locations && checkin.locations.length > 0 ? checkin.locations[0] : null;
+      const locations = checkin.locations && checkin.locations.length > 0 
+        ? checkin.locations.map(loc => ({
+            location_type: loc.location_type,
+            location_detail: loc.location_detail,
+          }))
+        : [{ location_type: 1, location_detail: "" }];
       
       setEditForm({
         notes: checkin.notes,
         late_reason: checkin.late_reason,
         time: localDateTimeString,
         userTimezone: userTimezone,
-        locations: [
-          {
-            location_type: location?.location_type || 1,
-            location_detail: location?.location_detail || "",
-          },
-        ],
+        locations: locations,
       });
       setShowEditModal(true);
     }
@@ -600,9 +596,18 @@ export default function AttendancePage() {
       return;
     }
 
-    // Validate location
-    if (!createForm.locations[0].location_detail || createForm.locations[0].location_detail.trim() === "") {
-      toast.error("Debe especificar el detalle de ubicación");
+    // Validate locations
+    if (!createForm.locations || createForm.locations.length === 0) {
+      toast.error("Debe especificar al menos una ubicación");
+      return;
+    }
+
+    // Validate that all locations have details
+    const invalidLocations = createForm.locations.filter(
+      location => !location.location_detail || location.location_detail.trim() === ""
+    );
+    if (invalidLocations.length > 0) {
+      toast.error("Todos los detalles de ubicación son obligatorios");
       return;
     }
 
@@ -638,6 +643,21 @@ export default function AttendancePage() {
     if (!editingCheckin.checkin_id) {
       console.error("Checkin ID is null or undefined:", editingCheckin);
       toast.error("Error: ID de check-in no válido");
+      return;
+    }
+
+    // Validate locations
+    if (!editForm.locations || editForm.locations.length === 0) {
+      toast.error("Debe especificar al menos una ubicación");
+      return;
+    }
+
+    // Validate that all locations have details
+    const invalidLocations = editForm.locations.filter(
+      location => !location.location_detail || location.location_detail.trim() === ""
+    );
+    if (invalidLocations.length > 0) {
+      toast.error("Todos los detalles de ubicación son obligatorios");
       return;
     }
 
@@ -790,13 +810,12 @@ export default function AttendancePage() {
       }),
       columnHelper.display({
         id: "location",
-        header: "Ubicación",
+        header: "Ubicaciones",
         cell: (info) => {
           const record = info.row.original;
           const locations = record.locations;
-          const location = locations && locations.length > 0 ? locations[0] : null;
           
-          if (!location) {
+          if (!locations || locations.length === 0) {
             return (
               <div className="flex items-center gap-2">
                 <span className="text-lg">❓</span>
@@ -829,23 +848,65 @@ export default function AttendancePage() {
             }
           };
 
-          const locationInfo = getLocationInfo(location.location_type);
-          
-          return (
-            <div className="flex items-center gap-2">
-              <span className="text-lg">
-                {locationInfo.icon}
-              </span>
-              <div className="flex flex-col">
-                <span className="capitalize text-sm">
-                  {locationInfo.label}
+          // If only one location, show it normally
+          if (locations.length === 1) {
+            const location = locations[0];
+            const locationInfo = getLocationInfo(location.location_type);
+            
+            return (
+              <div className="flex items-center gap-2">
+                <span className="text-lg">
+                  {locationInfo.icon}
                 </span>
-                {location.location_detail && (
-                  <span className="text-xs text-muted-foreground">
-                    {location.location_detail}
+                <div className="flex flex-col">
+                  <span className="capitalize text-sm font-medium">
+                    {locationInfo.label}
                   </span>
-                )}
+                  {location.location_detail && (
+                    <span className="text-xs text-muted-foreground max-w-[200px] truncate" title={location.location_detail}>
+                      {location.location_detail}
+                    </span>
+                  )}
+                </div>
               </div>
+            );
+          }
+
+          // If multiple locations, show a compact summary with expandable details
+          return (
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">
+                  {locations.length} ubicación{locations.length > 1 ? 'es' : ''}
+                </span>
+                <Badge variant="secondary" className="text-xs">
+                  {locations.length}
+                </Badge>
+              </div>
+              
+              {/* Show latest location as preview */}
+              <div className="flex items-center gap-2 p-1 bg-gray-50 rounded">
+                <span className="text-sm">
+                  {getLocationInfo(locations[locations.length - 1].location_type).icon}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium text-gray-700">
+                    {getLocationInfo(locations[locations.length - 1].location_type).label}
+                  </div>
+                  {locations[locations.length - 1].location_detail && (
+                    <div className="text-xs text-gray-600 truncate" title={locations[locations.length - 1].location_detail}>
+                      {locations[locations.length - 1].location_detail}
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Show additional locations count if more than 1 */}
+              {locations.length > 1 && (
+                <div className="text-xs text-blue-600 font-medium">
+                  +{locations.length - 1} ubicación{locations.length > 2 ? 'es' : ''} más
+                </div>
+              )}
             </div>
           );
         },
@@ -1144,12 +1205,14 @@ export default function AttendancePage() {
                                   setCreateForm((prev) => ({
                                     ...prev,
                                     user_id: user.id,
-                                    locations: [
-                                      {
-                                        ...prev.locations[0],
-                                        location_detail: autoLocationDetail,
-                                      },
-                                    ],
+                                    locations: prev.locations?.map((loc, index) => 
+                                      index === 0 
+                                        ? {
+                                            ...loc,
+                                            location_detail: autoLocationDetail,
+                                          }
+                                        : loc
+                                    ) || [],
                                   }));
                                   setUserSearchTerm(user.name);
                                   setShowUserDropdown(false);
@@ -1277,86 +1340,141 @@ export default function AttendancePage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Tipo de Ubicación</Label>
-                    <Select
-                      value={createForm.locations[0].location_type.toString()}
-                      onValueChange={(value) => {
-                        const locationType = parseInt(value);
-                        const autoLocationDetail = autoPopulateLocationDetails(createForm.user_id, locationType);
-                        
-                        setCreateForm((prev) => ({
-                          ...prev,
-                          locations: [
-                            {
-                              ...prev.locations[0],
-                              location_type: locationType,
-                              location_detail: autoLocationDetail,
-                            },
-                          ],
-                        }));
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {locationTypes.length > 0 ? (
-                          // Use dynamic catalogs
-                          locationTypes.map((locationType) => (
-                            <SelectItem key={locationType.id} value={locationType.id.toString()}>
-                              📍 {locationType.name}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          // Fallback to hardcoded enums
-                          <>
-                            <SelectItem value={LOCATION_TYPES.OFFICE.toString()}>
-                              🏢 {LOCATION_TYPE_LABELS[LOCATION_TYPES.OFFICE]}
-                            </SelectItem>
-                            <SelectItem value={LOCATION_TYPES.REMOTE_DECLARED.toString()}>
-                              🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_DECLARED]}
-                            </SelectItem>
-                            <SelectItem value={LOCATION_TYPES.REMOTE_ALTERNATIVE.toString()}>
-                              🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_ALTERNATIVE]}
-                            </SelectItem>
-                            <SelectItem value={LOCATION_TYPES.CLIENT.toString()}>
-                              🏢 {LOCATION_TYPE_LABELS[LOCATION_TYPES.CLIENT]}
-                            </SelectItem>
-                          </>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Detalle de Ubicación</Label>
-                    <Input
-                      placeholder="Ej: Piso 3, Escritorio 42"
-                      value={createForm.locations[0].location_detail}
-                      onChange={(e) =>
-                        setCreateForm((prev) => ({
-                          ...prev,
-                          locations: [
-                            {
-                              ...prev.locations[0],
-                              location_detail: e.target.value,
-                            },
-                          ],
-                        }))
-                      }
-                      className={createForm.locations[0].location_detail && 
-                        (createForm.locations[0].location_type === LOCATION_TYPES.OFFICE || 
-                         createForm.locations[0].location_type === LOCATION_TYPES.REMOTE_DECLARED) 
-                        ? "bg-gray-50" : ""}
-                    />
-                    {(createForm.locations[0].location_type === LOCATION_TYPES.OFFICE || 
-                      createForm.locations[0].location_type === LOCATION_TYPES.REMOTE_DECLARED) && 
-                      createForm.locations[0].location_detail && (
-                      <p className="text-xs text-muted-foreground">
-                        {createForm.locations[0].location_type === LOCATION_TYPES.OFFICE 
-                          ? "Dirección de oficina ABSTI auto-completada" 
-                          : "Dirección del usuario auto-completada"}
-                      </p>
-                    )}
+                    <Label>Ubicaciones</Label>
+                    <div className="space-y-3">
+                      {createForm.locations?.map((location, index) => (
+                        <div key={index} className="border rounded-lg p-3 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">Ubicación {index + 1}</span>
+                            {createForm.locations && createForm.locations.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setCreateForm((prev) => ({
+                                    ...prev,
+                                    locations: prev.locations?.filter((_, i) => i !== index) || [],
+                                  }));
+                                }}
+                                className="text-red-500 hover:text-red-700"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label className="text-sm">Tipo de Ubicación</Label>
+                            <Select
+                              value={location.location_type.toString()}
+                              onValueChange={(value) => {
+                                const locationType = parseInt(value);
+                                const autoLocationDetail = autoPopulateLocationDetails(createForm.user_id, locationType);
+                                
+                                setCreateForm((prev) => ({
+                                  ...prev,
+                                  locations: prev.locations?.map((loc, i) => 
+                                    i === index 
+                                      ? {
+                                          location_type: locationType,
+                                          location_detail: autoLocationDetail || loc.location_detail || "",
+                                        }
+                                      : loc
+                                  ) || [],
+                                }));
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {locationTypes.length > 0 ? (
+                                  // Use dynamic catalogs
+                                  locationTypes.map((locationType) => (
+                                    <SelectItem key={locationType.id} value={locationType.id.toString()}>
+                                      📍 {locationType.name}
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  // Fallback to hardcoded enums
+                                  <>
+                                    <SelectItem value={LOCATION_TYPES.OFFICE.toString()}>
+                                      🏢 {LOCATION_TYPE_LABELS[LOCATION_TYPES.OFFICE]}
+                                    </SelectItem>
+                                    <SelectItem value={LOCATION_TYPES.REMOTE_DECLARED.toString()}>
+                                      🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_DECLARED]}
+                                    </SelectItem>
+                                    <SelectItem value={LOCATION_TYPES.REMOTE_ALTERNATIVE.toString()}>
+                                      🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_ALTERNATIVE]}
+                                    </SelectItem>
+                                    <SelectItem value={LOCATION_TYPES.CLIENT.toString()}>
+                                      🏢 {LOCATION_TYPE_LABELS[LOCATION_TYPES.CLIENT]}
+                                    </SelectItem>
+                                  </>
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label className="text-sm">Detalle de Ubicación</Label>
+                            <Input
+                              placeholder="Ej: Piso 3, Escritorio 42"
+                              value={location.location_detail}
+                              onChange={(e) =>
+                                setCreateForm((prev) => ({
+                                  ...prev,
+                                  locations: prev.locations?.map((loc, i) => 
+                                    i === index 
+                                      ? {
+                                          location_type: loc.location_type,
+                                          location_detail: e.target.value,
+                                        }
+                                      : loc
+                                  ) || [],
+                                }))
+                              }
+                              className={location.location_detail && 
+                                (location.location_type === LOCATION_TYPES.OFFICE || 
+                                 location.location_type === LOCATION_TYPES.REMOTE_DECLARED) 
+                                ? "bg-gray-50" : ""}
+                            />
+                            {(location.location_type === LOCATION_TYPES.OFFICE || 
+                              location.location_type === LOCATION_TYPES.REMOTE_DECLARED) && 
+                              location.location_detail && (
+                              <p className="text-xs text-muted-foreground">
+                                {location.location_type === LOCATION_TYPES.OFFICE 
+                                  ? "Dirección de oficina ABSTI auto-completada" 
+                                  : "Dirección del usuario auto-completada"}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setCreateForm((prev) => ({
+                            ...prev,
+                            locations: [
+                              ...(prev.locations || []),
+                              {
+                                location_type: 1,
+                                location_detail: "",
+                              },
+                            ],
+                          }));
+                        }}
+                        className="w-full"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Agregar Ubicación
+                      </Button>
+                    </div>
                   </div>
                   {isTimeLate(createForm.time) && (
                     <div className="space-y-2">
@@ -1818,88 +1936,142 @@ export default function AttendancePage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Tipo de Ubicación</Label>
-              <Select
-                value={
-                  editForm.locations?.[0]?.location_type?.toString() || "1"
-                }
-                onValueChange={(value) => {
-                  const locationType = parseInt(value);
-                  const userId = editingCheckin?.user_id || 0;
-                  const autoLocationDetail = autoPopulateLocationDetails(userId, locationType);
-                  
-                  setEditForm((prev) => ({
-                    ...prev,
-                    locations: [
-                      {
-                        location_type: locationType,
-                        location_detail: autoLocationDetail || prev.locations?.[0]?.location_detail || "",
-                      },
-                    ],
-                  }));
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {locationTypes.length > 0 ? (
-                    // Use dynamic catalogs
-                    locationTypes.map((locationType) => (
-                      <SelectItem key={locationType.id} value={locationType.id.toString()}>
-                        📍 {locationType.name}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    // Fallback to hardcoded enums
-                    <>
-                      <SelectItem value={LOCATION_TYPES.OFFICE.toString()}>
-                        🏢 {LOCATION_TYPE_LABELS[LOCATION_TYPES.OFFICE]}
-                      </SelectItem>
-                      <SelectItem value={LOCATION_TYPES.REMOTE_DECLARED.toString()}>
-                        🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_DECLARED]}
-                      </SelectItem>
-                      <SelectItem value={LOCATION_TYPES.REMOTE_ALTERNATIVE.toString()}>
-                        🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_ALTERNATIVE]}
-                      </SelectItem>
-                      <SelectItem value={LOCATION_TYPES.CLIENT.toString()}>
-                        🏢 {LOCATION_TYPE_LABELS[LOCATION_TYPES.CLIENT]}
-                      </SelectItem>
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Detalle de Ubicación</Label>
-              <Input
-                placeholder="Ej: Piso 3, Escritorio 42"
-                value={editForm.locations?.[0]?.location_detail || ""}
-                onChange={(e) =>
-                  setEditForm((prev) => ({
-                    ...prev,
-                    locations: [
-                      {
-                        location_type: prev.locations?.[0]?.location_type || 1,
-                        location_detail: e.target.value,
-                      },
-                    ],
-                  }))
-                }
-                className={editForm.locations?.[0]?.location_detail && 
-                  (editForm.locations?.[0]?.location_type === LOCATION_TYPES.OFFICE || 
-                   editForm.locations?.[0]?.location_type === LOCATION_TYPES.REMOTE_DECLARED) 
-                  ? "bg-gray-50" : ""}
-              />
-              {(editForm.locations?.[0]?.location_type === LOCATION_TYPES.OFFICE || 
-                editForm.locations?.[0]?.location_type === LOCATION_TYPES.REMOTE_DECLARED) && 
-                editForm.locations?.[0]?.location_detail && (
-                <p className="text-xs text-muted-foreground">
-                  {editForm.locations?.[0]?.location_type === LOCATION_TYPES.OFFICE 
-                    ? "Dirección de oficina ABSTI auto-completada" 
-                    : "Dirección del usuario auto-completada"}
-                </p>
-              )}
+              <Label>Ubicaciones</Label>
+              <div className="space-y-3">
+                {editForm.locations?.map((location, index) => (
+                  <div key={index} className="border rounded-lg p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Ubicación {index + 1}</span>
+                      {editForm.locations && editForm.locations.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEditForm((prev) => ({
+                              ...prev,
+                              locations: prev.locations?.filter((_, i) => i !== index) || [],
+                            }));
+                          }}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-sm">Tipo de Ubicación</Label>
+                      <Select
+                        value={location.location_type?.toString() || "1"}
+                        onValueChange={(value) => {
+                          const locationType = parseInt(value);
+                          const userId = editingCheckin?.user_id || 0;
+                          const autoLocationDetail = autoPopulateLocationDetails(userId, locationType);
+                          
+                          setEditForm((prev) => ({
+                            ...prev,
+                            locations: prev.locations?.map((loc, i) => 
+                              i === index 
+                                ? {
+                                    location_type: locationType,
+                                    location_detail: autoLocationDetail || loc.location_detail || "",
+                                  }
+                                : loc
+                            ) || [],
+                          }));
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {locationTypes.length > 0 ? (
+                            // Use dynamic catalogs
+                            locationTypes.map((locationType) => (
+                              <SelectItem key={locationType.id} value={locationType.id.toString()}>
+                                📍 {locationType.name}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            // Fallback to hardcoded enums
+                            <>
+                              <SelectItem value={LOCATION_TYPES.OFFICE.toString()}>
+                                🏢 {LOCATION_TYPE_LABELS[LOCATION_TYPES.OFFICE]}
+                              </SelectItem>
+                              <SelectItem value={LOCATION_TYPES.REMOTE_DECLARED.toString()}>
+                                🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_DECLARED]}
+                              </SelectItem>
+                              <SelectItem value={LOCATION_TYPES.REMOTE_ALTERNATIVE.toString()}>
+                                🏠 {LOCATION_TYPE_LABELS[LOCATION_TYPES.REMOTE_ALTERNATIVE]}
+                              </SelectItem>
+                              <SelectItem value={LOCATION_TYPES.CLIENT.toString()}>
+                                🏢 {LOCATION_TYPE_LABELS[LOCATION_TYPES.CLIENT]}
+                              </SelectItem>
+                            </>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-sm">Detalle de Ubicación</Label>
+                      <Input
+                        placeholder="Ej: Piso 3, Escritorio 42"
+                        value={location.location_detail || ""}
+                        onChange={(e) =>
+                          setEditForm((prev) => ({
+                            ...prev,
+                            locations: prev.locations?.map((loc, i) => 
+                              i === index 
+                                ? {
+                                    location_type: loc.location_type,
+                                    location_detail: e.target.value,
+                                  }
+                                : loc
+                            ) || [],
+                          }))
+                        }
+                        className={location.location_detail && 
+                          (location.location_type === LOCATION_TYPES.OFFICE || 
+                           location.location_type === LOCATION_TYPES.REMOTE_DECLARED) 
+                          ? "bg-gray-50" : ""}
+                      />
+                      {(location.location_type === LOCATION_TYPES.OFFICE || 
+                        location.location_type === LOCATION_TYPES.REMOTE_DECLARED) && 
+                        location.location_detail && (
+                        <p className="text-xs text-muted-foreground">
+                          {location.location_type === LOCATION_TYPES.OFFICE 
+                            ? "Dirección de oficina ABSTI auto-completada" 
+                            : "Dirección del usuario auto-completada"}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setEditForm((prev) => ({
+                      ...prev,
+                      locations: [
+                        ...(prev.locations || []),
+                        {
+                          location_type: 1,
+                          location_detail: "",
+                        },
+                      ],
+                    }));
+                  }}
+                  className="w-full"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Agregar Ubicación
+                </Button>
+              </div>
             </div>
             {editingCheckin?.late && (
               <div className="space-y-2">
