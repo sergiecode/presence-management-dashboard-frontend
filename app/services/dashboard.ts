@@ -655,7 +655,6 @@ export async function updateUserHrDetails(
     monthly_objective_days?: number;
     notes?: string;
     office_days?: string;
-    on_site_required?: boolean;
     team?: string;
     teams_access?: boolean;
     weekly_hours?: number;

@@ -130,7 +130,6 @@ interface User {
   team: string;
   zoho_access: boolean;
   teams_access: boolean;
-  on_site_required: boolean;
   weekly_objective_days: number;
   monthly_objective_days: number;
   office_days: string;
@@ -155,7 +154,6 @@ interface HrDetailsForm {
   monthly_objective_days: number;
   notes: string;
   office_days: string;
-  on_site_required: boolean;
   team: string;
   teams_access: boolean;
   weekly_hours: number;
@@ -189,7 +187,6 @@ interface EditUserForm {
   notes: string;
   notification_offset_min: number;
   office_days: string;
-  on_site_required: boolean;
   phone: string;
   picture: string;
   role: string;
@@ -247,7 +244,6 @@ export default function EmployeesPage() {
     monthly_objective_days: 0,
     notes: "",
     office_days: "",
-    on_site_required: false,
     team: "",
     teams_access: false,
     weekly_hours: 0,
@@ -281,7 +277,6 @@ export default function EmployeesPage() {
     notes: "",
     notification_offset_min: 10,
     office_days: "",
-    on_site_required: false,
     phone: "",
     picture: "",
     role: "",
@@ -452,7 +447,6 @@ export default function EmployeesPage() {
         monthly_objective_days: userToEdit.monthly_objective_days || 0,
         notes: userToEdit.notes || "",
         office_days: userToEdit.office_days || "",
-        on_site_required: userToEdit.on_site_required || false,
         team: userToEdit.team || "",
         teams_access: userToEdit.teams_access || false,
         weekly_hours: userToEdit.weekly_hours || 0,
@@ -505,7 +499,6 @@ export default function EmployeesPage() {
         notes: userDetails.notes || "",
         notification_offset_min: userDetails.notification_offset_min || 10,
         office_days: userDetails.office_days || "",
-        on_site_required: userDetails.on_site_required || false,
         phone: userDetails.phone || "",
         picture: userDetails.picture || "",
         role: userDetails.role || "",
@@ -621,7 +614,6 @@ export default function EmployeesPage() {
         name: editForm.name,
         notes: editForm.notes,
         office_days: editForm.office_days,
-        on_site_required: editForm.on_site_required,
         phone: editForm.phone,
         picture: editForm.picture,
         role: editForm.role as "admin" | "hr" | "employee",
@@ -1018,7 +1010,12 @@ export default function EmployeesPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={fetchUsers} disabled={loading}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={fetchUsers}
+              disabled={loading}
+            >
               <RefreshCw
                 className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
               />
@@ -1026,10 +1023,6 @@ export default function EmployeesPage() {
             </Button>
           </div>
         </div>
-
-
-
-
 
         {/* Estadísticas */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -1058,7 +1051,9 @@ export default function EmployeesPage() {
           <Card className="p-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-muted-foreground">Recursos Humanos</p>
+                <p className="text-xs text-muted-foreground">
+                  Recursos Humanos
+                </p>
                 <p className="text-lg font-bold text-purple-600">
                   {users.filter((u) => u.role === "hr").length}
                 </p>
@@ -1070,7 +1065,9 @@ export default function EmployeesPage() {
           <Card className="p-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-muted-foreground">Usuarios Activos</p>
+                <p className="text-xs text-muted-foreground">
+                  Usuarios Activos
+                </p>
                 <p className="text-lg font-bold text-green-600">
                   {users.filter((u) => u.active && !u.pending_approval).length}
                 </p>
@@ -1082,7 +1079,9 @@ export default function EmployeesPage() {
           <Card className="p-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-muted-foreground">Pendientes Aprobación</p>
+                <p className="text-xs text-muted-foreground">
+                  Pendientes Aprobación
+                </p>
                 <p className="text-lg font-bold text-orange-600">
                   {users.filter((u) => u.pending_approval).length}
                 </p>
@@ -1094,40 +1093,40 @@ export default function EmployeesPage() {
 
         {/* Filtros */}
         <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar por nombre, email o equipo..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8"
-                  />
-                </div>
-              </div>
-              <Select value={roleFilter} onValueChange={setRoleFilter}>
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los Roles</SelectItem>
-                  <SelectItem value="admin">Administrador</SelectItem>
-                  <SelectItem value="hr">Recursos Humanos</SelectItem>
-                  <SelectItem value="employee">Empleado</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los Estados</SelectItem>
-                  <SelectItem value="active">Activos</SelectItem>
-                  <SelectItem value="inactive">Inactivos</SelectItem>
-                  <SelectItem value="pending">Pendientes</SelectItem>
-                </SelectContent>
-              </Select>
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nombre, email o equipo..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8"
+              />
             </div>
+          </div>
+          <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los Roles</SelectItem>
+              <SelectItem value="admin">Administrador</SelectItem>
+              <SelectItem value="hr">Recursos Humanos</SelectItem>
+              <SelectItem value="employee">Empleado</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los Estados</SelectItem>
+              <SelectItem value="active">Activos</SelectItem>
+              <SelectItem value="inactive">Inactivos</SelectItem>
+              <SelectItem value="pending">Pendientes</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
         {/* Tabla de usuarios */}
         <Card className="flex-1 flex flex-col min-h-0">
@@ -1178,89 +1177,92 @@ export default function EmployeesPage() {
                 <div className="flex-1 overflow-auto">
                   <div className="rounded-md border">
                     <Table>
-                    <TableHeader>
-                      {table.getHeaderGroups().map((headerGroup) => (
-                        <TableRow key={headerGroup.id}>
-                          {headerGroup.headers.map((header) => (
-                            <TableHead
-                              key={header.id}
-                              className="font-semibold"
-                            >
-                              {header.isPlaceholder
-                                ? null
-                                : flexRender(
-                                    header.column.columnDef.header,
-                                    header.getContext()
-                                  )}
-                            </TableHead>
-                          ))}
-                        </TableRow>
-                      ))}
-                    </TableHeader>
-                    <TableBody>
-                      {table.getRowModel().rows?.length ? (
-                        table.getRowModel().rows.map((row) => (
-                          <TableRow key={row.id} className="hover:bg-muted/50">
-                            {row.getVisibleCells().map((cell) => (
-                              <TableCell key={cell.id}>
-                                {flexRender(
-                                  cell.column.columnDef.cell,
-                                  cell.getContext()
-                                )}
-                              </TableCell>
+                      <TableHeader>
+                        {table.getHeaderGroups().map((headerGroup) => (
+                          <TableRow key={headerGroup.id}>
+                            {headerGroup.headers.map((header) => (
+                              <TableHead
+                                key={header.id}
+                                className="font-semibold"
+                              >
+                                {header.isPlaceholder
+                                  ? null
+                                  : flexRender(
+                                      header.column.columnDef.header,
+                                      header.getContext()
+                                    )}
+                              </TableHead>
                             ))}
                           </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell
-                            colSpan={columns.length}
-                            className="h-24 text-center"
-                          >
-                            No hay resultados.
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
+                        ))}
+                      </TableHeader>
+                      <TableBody>
+                        {table.getRowModel().rows?.length ? (
+                          table.getRowModel().rows.map((row) => (
+                            <TableRow
+                              key={row.id}
+                              className="hover:bg-muted/50"
+                            >
+                              {row.getVisibleCells().map((cell) => (
+                                <TableCell key={cell.id}>
+                                  {flexRender(
+                                    cell.column.columnDef.cell,
+                                    cell.getContext()
+                                  )}
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell
+                              colSpan={columns.length}
+                              className="h-24 text-center"
+                            >
+                              No hay resultados.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
 
-                {/* Paginación */}
-                <div className="flex items-center justify-between space-x-2 py-4 mt-auto">
-                  <div className="text-sm text-muted-foreground">
-                    Mostrando{" "}
-                    {table.getState().pagination.pageIndex *
-                      table.getState().pagination.pageSize +
-                      1}{" "}
-                    a{" "}
-                    {Math.min(
-                      (table.getState().pagination.pageIndex + 1) *
-                        table.getState().pagination.pageSize,
-                      filteredData.length
-                    )}{" "}
-                    de {filteredData.length} usuarios
+                  {/* Paginación */}
+                  <div className="flex items-center justify-between space-x-2 py-4 mt-auto">
+                    <div className="text-sm text-muted-foreground">
+                      Mostrando{" "}
+                      {table.getState().pagination.pageIndex *
+                        table.getState().pagination.pageSize +
+                        1}{" "}
+                      a{" "}
+                      {Math.min(
+                        (table.getState().pagination.pageIndex + 1) *
+                          table.getState().pagination.pageSize,
+                        filteredData.length
+                      )}{" "}
+                      de {filteredData.length} usuarios
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => table.previousPage()}
+                        disabled={!table.getCanPreviousPage()}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        Anterior
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => table.nextPage()}
+                        disabled={!table.getCanNextPage()}
+                      >
+                        Siguiente
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => table.previousPage()}
-                      disabled={!table.getCanPreviousPage()}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                      Anterior
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => table.nextPage()}
-                      disabled={!table.getCanNextPage()}
-                    >
-                      Siguiente
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
                 </div>
               </>
             )}
@@ -1338,10 +1340,16 @@ export default function EmployeesPage() {
                     </Label>
                     <div className="relative flex gap-2">
                       <Input
-                        value={hrForm.birth_date ? (() => {
-                          const date = new Date(hrForm.birth_date);
-                          return !isNaN(date.getTime()) ? date.toLocaleDateString("es-ES") : "";
-                        })() : ""}
+                        value={
+                          hrForm.birth_date
+                            ? (() => {
+                                const date = new Date(hrForm.birth_date);
+                                return !isNaN(date.getTime())
+                                  ? date.toLocaleDateString("es-ES")
+                                  : "";
+                              })()
+                            : ""
+                        }
                         placeholder="dd/mm/yyyy"
                         className={`bg-background pr-10 ${
                           hrFormErrors.some((e) => e.includes("nacimiento"))
@@ -1351,12 +1359,21 @@ export default function EmployeesPage() {
                         onChange={(e) => {
                           const inputValue = e.target.value;
                           // Parse DD/MM/YYYY format
-                          const match = inputValue.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                          const match = inputValue.match(
+                            /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/
+                          );
                           if (match) {
                             const [, day, month, year] = match;
-                            const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                            const date = new Date(
+                              parseInt(year),
+                              parseInt(month) - 1,
+                              parseInt(day)
+                            );
                             if (!isNaN(date.getTime())) {
-                              const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                              const formattedDate = `${year}-${month.padStart(
+                                2,
+                                "0"
+                              )}-${day.padStart(2, "0")}`;
                               setHrForm((prev) => ({
                                 ...prev,
                                 birth_date: formattedDate,
@@ -1371,14 +1388,19 @@ export default function EmployeesPage() {
                           }
                         }}
                       />
-                      <Popover open={showBirthDatePicker} onOpenChange={setShowBirthDatePicker}>
+                      <Popover
+                        open={showBirthDatePicker}
+                        onOpenChange={setShowBirthDatePicker}
+                      >
                         <PopoverTrigger asChild>
                           <Button
                             variant="ghost"
                             className="absolute top-1/2 right-2 size-6 -translate-y-1/2"
                           >
                             <CalendarDays className="size-3.5" />
-                            <span className="sr-only">Seleccionar fecha de nacimiento</span>
+                            <span className="sr-only">
+                              Seleccionar fecha de nacimiento
+                            </span>
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent
@@ -1389,13 +1411,22 @@ export default function EmployeesPage() {
                         >
                           <Calendar
                             mode="single"
-                            selected={hrForm.birth_date ? new Date(hrForm.birth_date) : undefined}
+                            selected={
+                              hrForm.birth_date
+                                ? new Date(hrForm.birth_date)
+                                : undefined
+                            }
                             captionLayout="dropdown"
                             onSelect={(date) => {
                               if (date) {
                                 const year = date.getFullYear();
-                                const month = String(date.getMonth() + 1).padStart(2, '0');
-                                const day = String(date.getDate()).padStart(2, '0');
+                                const month = String(
+                                  date.getMonth() + 1
+                                ).padStart(2, "0");
+                                const day = String(date.getDate()).padStart(
+                                  2,
+                                  "0"
+                                );
                                 setHrForm((prev) => ({
                                   ...prev,
                                   birth_date: `${year}-${month}-${day}`,
@@ -1407,7 +1438,10 @@ export default function EmployeesPage() {
                               formatMonthDropdown: (date: Date) =>
                                 date.toLocaleString("es", { month: "long" }),
                               formatCaption: (date: Date) =>
-                                date.toLocaleString("es", { month: "long", year: "numeric" }),
+                                date.toLocaleString("es", {
+                                  month: "long",
+                                  year: "numeric",
+                                }),
                               formatWeekdayName: (date: Date) =>
                                 date.toLocaleString("es", { weekday: "short" }),
                             }}
@@ -1423,10 +1457,16 @@ export default function EmployeesPage() {
                     </Label>
                     <div className="relative flex gap-2">
                       <Input
-                        value={hrForm.hire_date ? (() => {
-                          const date = new Date(hrForm.hire_date);
-                          return !isNaN(date.getTime()) ? date.toLocaleDateString("es-ES") : "";
-                        })() : ""}
+                        value={
+                          hrForm.hire_date
+                            ? (() => {
+                                const date = new Date(hrForm.hire_date);
+                                return !isNaN(date.getTime())
+                                  ? date.toLocaleDateString("es-ES")
+                                  : "";
+                              })()
+                            : ""
+                        }
                         placeholder="dd/mm/yyyy"
                         className={`bg-background pr-10 ${
                           hrFormErrors.some((e) => e.includes("contratación"))
@@ -1436,12 +1476,21 @@ export default function EmployeesPage() {
                         onChange={(e) => {
                           const inputValue = e.target.value;
                           // Parse DD/MM/YYYY format
-                          const match = inputValue.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                          const match = inputValue.match(
+                            /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/
+                          );
                           if (match) {
                             const [, day, month, year] = match;
-                            const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                            const date = new Date(
+                              parseInt(year),
+                              parseInt(month) - 1,
+                              parseInt(day)
+                            );
                             if (!isNaN(date.getTime())) {
-                              const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                              const formattedDate = `${year}-${month.padStart(
+                                2,
+                                "0"
+                              )}-${day.padStart(2, "0")}`;
                               setHrForm((prev) => ({
                                 ...prev,
                                 hire_date: formattedDate,
@@ -1456,14 +1505,19 @@ export default function EmployeesPage() {
                           }
                         }}
                       />
-                      <Popover open={showHireDatePicker} onOpenChange={setShowHireDatePicker}>
+                      <Popover
+                        open={showHireDatePicker}
+                        onOpenChange={setShowHireDatePicker}
+                      >
                         <PopoverTrigger asChild>
                           <Button
                             variant="ghost"
                             className="absolute top-1/2 right-2 size-6 -translate-y-1/2"
                           >
                             <CalendarDays className="size-3.5" />
-                            <span className="sr-only">Seleccionar fecha de contratación</span>
+                            <span className="sr-only">
+                              Seleccionar fecha de contratación
+                            </span>
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent
@@ -1474,13 +1528,22 @@ export default function EmployeesPage() {
                         >
                           <Calendar
                             mode="single"
-                            selected={hrForm.hire_date ? new Date(hrForm.hire_date) : undefined}
+                            selected={
+                              hrForm.hire_date
+                                ? new Date(hrForm.hire_date)
+                                : undefined
+                            }
                             captionLayout="dropdown"
                             onSelect={(date) => {
                               if (date) {
                                 const year = date.getFullYear();
-                                const month = String(date.getMonth() + 1).padStart(2, '0');
-                                const day = String(date.getDate()).padStart(2, '0');
+                                const month = String(
+                                  date.getMonth() + 1
+                                ).padStart(2, "0");
+                                const day = String(date.getDate()).padStart(
+                                  2,
+                                  "0"
+                                );
                                 setHrForm((prev) => ({
                                   ...prev,
                                   hire_date: `${year}-${month}-${day}`,
@@ -1492,7 +1555,10 @@ export default function EmployeesPage() {
                               formatMonthDropdown: (date: Date) =>
                                 date.toLocaleString("es", { month: "long" }),
                               formatCaption: (date: Date) =>
-                                date.toLocaleString("es", { month: "long", year: "numeric" }),
+                                date.toLocaleString("es", {
+                                  month: "long",
+                                  year: "numeric",
+                                }),
                               formatWeekdayName: (date: Date) =>
                                 date.toLocaleString("es", { weekday: "short" }),
                             }}
@@ -1536,7 +1602,7 @@ export default function EmployeesPage() {
                       onChange={(e) => {
                         const value = e.target.value;
                         // Remove leading zeros but allow single zero
-                        const cleanValue = value.replace(/^0+/, '') || '0';
+                        const cleanValue = value.replace(/^0+/, "") || "0";
                         setHrForm((prev) => ({
                           ...prev,
                           weekly_hours: parseInt(cleanValue) || 0,
@@ -1562,7 +1628,7 @@ export default function EmployeesPage() {
                       onChange={(e) => {
                         const value = e.target.value;
                         // Remove leading zeros but allow single zero
-                        const cleanValue = value.replace(/^0+/, '') || '0';
+                        const cleanValue = value.replace(/^0+/, "") || "0";
                         setHrForm((prev) => ({
                           ...prev,
                           weekly_objective_days: parseInt(cleanValue) || 0,
@@ -1590,7 +1656,7 @@ export default function EmployeesPage() {
                       onChange={(e) => {
                         const value = e.target.value;
                         // Remove leading zeros but allow single zero
-                        const cleanValue = value.replace(/^0+/, '') || '0';
+                        const cleanValue = value.replace(/^0+/, "") || "0";
                         setHrForm((prev) => ({
                           ...prev,
                           monthly_objective_days: parseInt(cleanValue) || 0,
@@ -1619,21 +1685,6 @@ export default function EmployeesPage() {
                       placeholder="Lunes a Viernes"
                     />
                   </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="on_site_required"
-                    checked={hrForm.on_site_required}
-                    onChange={(e) =>
-                      setHrForm((prev) => ({
-                        ...prev,
-                        on_site_required: e.target.checked,
-                      }))
-                    }
-                    className="h-4 w-4"
-                  />
-                  <Label htmlFor="on_site_required">Requerido en sitio</Label>
                 </div>
               </div>
 
@@ -2073,7 +2124,7 @@ export default function EmployeesPage() {
                       onChange={(e) => {
                         const value = e.target.value;
                         // Remove leading zeros but allow single zero
-                        const cleanValue = value.replace(/^0+/, '') || '0';
+                        const cleanValue = value.replace(/^0+/, "") || "0";
                         setEditForm((prev) => ({
                           ...prev,
                           weekly_hours: parseInt(cleanValue) || 0,
@@ -2091,7 +2142,7 @@ export default function EmployeesPage() {
                       onChange={(e) => {
                         const value = e.target.value;
                         // Remove leading zeros but allow single zero
-                        const cleanValue = value.replace(/^0+/, '') || '0';
+                        const cleanValue = value.replace(/^0+/, "") || "0";
                         setEditForm((prev) => ({
                           ...prev,
                           weekly_objective_days: parseInt(cleanValue) || 0,
@@ -2109,7 +2160,7 @@ export default function EmployeesPage() {
                       onChange={(e) => {
                         const value = e.target.value;
                         // Remove leading zeros but allow single zero
-                        const cleanValue = value.replace(/^0+/, '') || '0';
+                        const cleanValue = value.replace(/^0+/, "") || "0";
                         setEditForm((prev) => ({
                           ...prev,
                           monthly_objective_days: parseInt(cleanValue) || 0,
@@ -2136,23 +2187,6 @@ export default function EmployeesPage() {
                   <div className="flex items-center space-x-2">
                     <input
                       type="checkbox"
-                      id="on_site_required_edit"
-                      checked={editForm.on_site_required}
-                      onChange={(e) =>
-                        setEditForm((prev) => ({
-                          ...prev,
-                          on_site_required: e.target.checked,
-                        }))
-                      }
-                      className="h-4 w-4"
-                    />
-                    <Label htmlFor="on_site_required_edit">
-                      Requerido en sitio
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
                       id="end_of_day_absence_edit"
                       checked={editForm.end_of_day_absence_detection}
                       onChange={(e) =>
@@ -2169,8 +2203,6 @@ export default function EmployeesPage() {
                   </div>
                 </div>
               </div>
-
-
 
               {/* Notas */}
               <div className="space-y-2">

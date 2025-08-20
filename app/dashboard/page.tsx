@@ -38,7 +38,6 @@ interface UsersStats {
   employees: number;
   hr: number;
   access_stats: {
-    on_site_required: number;
     teams_access: number;
     zoho_access: number;
   };
